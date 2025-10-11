@@ -6,7 +6,7 @@ const API_KEY = process.env.VISUAL_CROSSING_API_KEY;
 const BASE_URL =
   "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline";
 
-const DB_BATCH_SIZE = 500;
+const DB_BATCH_SIZE = 500; // Adjust based on performance testing
 
 /**
  * Generate 6-month chunks between start and end dates
@@ -35,7 +35,7 @@ const generateChunks = (startDate, endDate) => {
   return chunks;
 };
 
-const saveWeatherDataByCoordinates = async (
+exports.saveWeatherDataByCoordinates = async (
   locations,
   start_date,
   end_date,
@@ -126,5 +126,3 @@ const saveWeatherDataByCoordinates = async (
     );
   }
 };
-
-module.exports = { saveWeatherDataByCoordinates };

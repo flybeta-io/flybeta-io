@@ -1,130 +1,15 @@
-const fs = require("fs");
-const csv = require("csv-parser");
 const Airport = require("../models/airport");
 const {
   fetchAirportCoordinatesByICAO,
   convertCoordinatesToArray,
-} = require("../utils/fetchAirportData");
+  uploadAirport,
+} = require("../utils/airportData");
 const { saveWeatherDataByCoordinates } = require("./weatherController");
 
-// --- Validation ---
-const validateAirportData = (airportData) => {
-  const errors = [];
-  const { name, icao_code, iata_code, latitude_deg, longitude_deg, type } =
-    airportData;
 
-  if (!name?.trim()) errors.push("Name is required");
-  if (!icao_code?.trim()) errors.push("ICAO code is required");
-  if (!iata_code?.trim()) errors.push("IATA code is required");
 
-  if (latitude_deg === undefined || latitude_deg === null)
-    errors.push("Latitude is required");
-  else if (latitude_deg < -90 || latitude_deg > 90)
-    errors.push("Latitude must be between -90 and 90");
-
-  if (longitude_deg === undefined || longitude_deg === null)
-    errors.push("Longitude is required");
-  else if (longitude_deg < -180 || longitude_deg > 180)
-    errors.push("Longitude must be between -180 and 180");
-
-  if (!type?.trim()) errors.push("Type is required");
-
-  return errors;
-};
-
-// --- Ensure uploads folder exists ---
-if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
-
-// --- Upload + Parse Airport File ---
-const uploadAirport = async (req) => {
-  const filePath = req.file?.path;
-  if (!filePath) throw new Error("No file uploaded");
-
-  const fileExtension = req.file.originalname.toLowerCase().split(".").pop();
-  const results = [];
-  const errors = [];
-
-  const icaoCodes = [];
-  const iataCodes = [];
-
-  try {
-    if (fileExtension === "csv") {
-      await new Promise((resolve, reject) => {
-        fs.createReadStream(filePath)
-          .pipe(
-            csv({
-              mapHeaders: ({ header }) =>
-                header.toLowerCase().trim().replace(/\s+/g, "_"),
-            })
-          )
-          .on("data", (data) => {
-            const airportData = {
-              name: data.name?.trim(),
-              icao_code: data.icao_code?.trim(),
-              iata_code: data.iata_code?.trim(),
-              latitude_deg: parseFloat(data.latitude_deg),
-              longitude_deg: parseFloat(data.longitude_deg),
-              type: data.type?.trim(),
-            };
-
-            const validationErrors = validateAirportData(airportData);
-            if (validationErrors.length === 0) {
-              results.push(airportData);
-              if (airportData.icao_code) icaoCodes.push(airportData.icao_code);
-              if (airportData.iata_code) iataCodes.push(airportData.iata_code);
-            } else {
-              errors.push({ data: airportData, errors: validationErrors });
-            }
-          })
-          .on("end", resolve)
-          .on("error", reject);
-      });
-    } else if (fileExtension === "json") {
-      const jsonData = JSON.parse(fs.readFileSync(filePath, "utf8"));
-      const dataArray = Array.isArray(jsonData) ? jsonData : [jsonData];
-      for (const data of dataArray) {
-        const airportData = {
-          name: data.name?.trim(),
-          icao_code: data.icao_code?.trim(),
-          iata_code: data.iata_code?.trim(),
-          latitude_deg: parseFloat(data.latitude_deg),
-          longitude_deg: parseFloat(data.longitude_deg),
-          type: data.type?.trim(),
-        };
-        const validationErrors = validateAirportData(airportData);
-        if (validationErrors.length === 0) {
-          results.push(airportData);
-          if (airportData.icao_code) icaoCodes.push(airportData.icao_code);
-          if (airportData.iata_code) iataCodes.push(airportData.iata_code);
-        } else {
-          errors.push({ data: airportData, errors: validationErrors });
-        }
-      }
-    } else {
-      throw new Error("Unsupported file format");
-    }
-
-    // Save valid airports to DB
-    const savedAirports = [];
-    for (const airport of results) {
-      try {
-        const saved = await Airport.create(airport);
-        savedAirports.push(saved);
-      } catch (dbError) {
-        console.warn(`Skipping ${airport.name}: ${dbError.message}`);
-      }
-    }
-
-    fs.unlinkSync(filePath);
-    return { savedAirports, errors, icaoCodes, iataCodes };
-  } catch (error) {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    throw new Error(error.message);
-  }
-};
-
-// --- Upload File + Fetch Weather Data ---
-const uploadAirportsByFile = async (req, res) => {
+// --- Upload File + Fetch 5 year Weather Data ---
+exports.uploadAirportsByFile = async (req, res) => {
   try {
     const { errors, icaoCodes, iataCodes } = await uploadAirport(req);
 
@@ -203,4 +88,6 @@ const uploadAirportsByFile = async (req, res) => {
   }
 };
 
-module.exports = { uploadAirportsByFile };
+
+
+// Fetch weather data by coordinates by taking latitude and longitude
