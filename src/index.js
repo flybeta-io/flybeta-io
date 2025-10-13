@@ -2,14 +2,18 @@ require("dotenv").config();
 const express = require("express");
 const sequelize = require('../config/sequelize');
 const PORT = process.env.PORT || 5000;
+const {
+  fetchWeatherDataAndSaveToDB,
+} = require("./controllers/weatherController");
 
+// await fetchWeatherDataAndSaveToDB({ days: 1 }); // Fetch past 1 day of data on startup
 
 const app = express();
 app.use(express.json());
 
 // Import Routes
-const airportRoutes = require('./routes/airportsRoutes')
-app.use("/airports", airportRoutes);
+// const airportRoutes = require('./routes/airportsRoutes')
+// app.use("/airports", airportRoutes);
 
 app.listen(PORT, async () => {
   try {

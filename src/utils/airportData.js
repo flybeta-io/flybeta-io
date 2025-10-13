@@ -29,21 +29,17 @@ const validateAirportData = (airportData) => {
 };
 
 
-
 // --- Ensure uploads folder exists ---
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
 
 // uploadAirport function to handle file upload and parsing
-exports.uploadAirport = async (req, res) => {
+exports.uploadAirportsToDB = async (req, res) => {
   const filePath = req.file?.path;
   if (!filePath) throw new Error("No file uploaded");
 
   const fileExtension = req.file.originalname.toLowerCase().split(".").pop();
   const results = [];
   const errors = [];
-
-  const icaoCodes = [];
-  const iataCodes = [];
 
   try {
     if (fileExtension === "csv") {
@@ -68,8 +64,6 @@ exports.uploadAirport = async (req, res) => {
             const validationErrors = validateAirportData(airportData);
             if (validationErrors.length === 0) {
               results.push(airportData);
-              if (airportData.icao_code) icaoCodes.push(airportData.icao_code);
-              if (airportData.iata_code) iataCodes.push(airportData.iata_code);
             } else {
               errors.push({ data: airportData, errors: validationErrors });
             }
@@ -92,8 +86,6 @@ exports.uploadAirport = async (req, res) => {
         const validationErrors = validateAirportData(airportData);
         if (validationErrors.length === 0) {
           results.push(airportData);
-          if (airportData.icao_code) icaoCodes.push(airportData.icao_code);
-          if (airportData.iata_code) iataCodes.push(airportData.iata_code);
         } else {
           errors.push({ data: airportData, errors: validationErrors });
         }
@@ -138,35 +130,21 @@ exports.uploadAirport = async (req, res) => {
 
 
 
-//Fetch Airport ICAO codes from the database
-exports.fetchAllAirportsICAOcodes = async () => {
+//Fetch Airport ICAO codes and IATA codes from the database
+exports.fetchAllAirportsICAOandIATAcodesfromDB = async () => {
   try {
     const airports = await Airport.findAll({
-      attributes: ["icao_code"],
+      attributes: ["icao_code", "iata_code"],
     });
-    return airports.map((a) => a.icao_code);
+    return airports.map((a) => ({
+      icao_code: a.icao_code,
+      iata_code: a.iata_code,
+    }));
   } catch (error) {
     console.error("Error fetching ICAO codes: ", error);
     return [];
   }
 };
-
-
-
-//Fetch Airport IATA codes from the database
-exports.fetchAllAirportsIATAcodes = async () => {
-  try {
-    const airports = await Airport.findAll({
-      attributes: ["iata_code"],
-    });
-    return airports.map((a) => a.iata_code);
-  } catch (error) {
-    console.error("Error fetching IATA codes: ", error);
-    return [];
-  }
-};
-
-
 
 
 // Fetch Airport Coordinates from the database by ICAO codes
@@ -191,7 +169,6 @@ exports.fetchAirportCoordinatesByICAO = async (icao_codes) => {
     }
 
     const result = airports.map((a) => a.dataValues);
-    // console.log(result);
     return result;
   } catch (error) {
     console.error("Error fetching coordinates: ", error);
@@ -228,15 +205,4 @@ exports.fetchAirportCoordinatesByIATA = async (iata_codes) => {
   } catch (error) {
     console.error("Error fetching coordinates: ", error);
   }
-};
-
-
-// Convert retrieved coordinates to array of "lat,lon" strings
-exports.convertCoordinatesToArray = async (retrievedCoordinates) => {
-  const resultSet = new Set();
-  retrievedCoordinates.forEach((element) => {
-    resultSet.add(`${element.latitude_deg},${element.longitude_deg}`);
-  });
-
-  return Array.from(resultSet);
 };
