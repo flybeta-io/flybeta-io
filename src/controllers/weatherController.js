@@ -1,13 +1,11 @@
 const {
-  generateDailyChunk,
-  generateDynamicYearChunks,
   fetchandSaveWeatherDataForEachAirport,
 } = require("../utils/weatherData");
 const {
   fetchAllAirportsICAOandIATAcodesfromDB,
 } = require("../utils/airportData");
+const { generateDailyChunk, generateDynamicYearChunks } = require("../utils/generic");
 
-const CONCURRENT_AIRPORTS = 2; // max concurrent ICAO fetches
 
 /* ----------------------------- Main Controller ----------------------------- */
 
@@ -31,20 +29,14 @@ exports.fetchWeatherDataAndSaveToDB = async ({ days = null, years = null }) => {
     console.log(`→ Mode: Past ${days} days`);
   } else if (years) {
     chunks = generateDynamicYearChunks(years);
-    console.log(`→ Mode: Past ${years} year(s) (chunked by year)`);
+    console.log(`→ Mode: Past ${years} year(s) (chunked by month)`);
   } else {
     throw new Error("Specify either { days } or { years }");
   }
 
-  // Concurrency handling — process airports in batches
-  const airportQueue = [...codes];
-  while (airportQueue.length > 0) {
-    const batch = airportQueue.splice(0, CONCURRENT_AIRPORTS);
-    await Promise.all(
-      batch.map(({ icao_code, iata_code }) =>
-        fetchandSaveWeatherDataForEachAirport(icao_code, iata_code, chunks)
-      )
-    );
+  // Sequentially process each airport code
+  for (const { icao_code, iata_code } of codes) {
+    await fetchandSaveWeatherDataForEachAirport(icao_code, iata_code, chunks);
   }
 
   console.log("✅ All weather data fetched and saved successfully.");

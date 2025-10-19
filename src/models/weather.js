@@ -1,6 +1,6 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../../config/sequelize");
-const Airport = require("./airport"); // Import Airport model
+const Airport = require("./Airport");
 
 const Weather = sequelize.define(
   "weather",
@@ -34,6 +34,10 @@ const Weather = sequelize.define(
       type: DataTypes.FLOAT,
       allowNull: true,
     },
+    precipitation_probability: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
     wind_speed: {
       type: DataTypes.FLOAT,
       allowNull: true,
@@ -46,11 +50,11 @@ const Weather = sequelize.define(
       type: DataTypes.FLOAT,
       allowNull: true,
     },
-    pressure: {
+    humidity: {
       type: DataTypes.FLOAT,
       allowNull: true,
     },
-    cloud_ceiling: {
+    pressure: {
       type: DataTypes.FLOAT,
       allowNull: true,
     },

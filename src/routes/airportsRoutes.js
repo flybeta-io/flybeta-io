@@ -21,10 +21,10 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
-// router.post(
-//   "/upload",
-//   upload.single("file"),
-//   airportController.uploadAirportsByFile
-// );
+router.post(
+  "/upload",
+  upload.single("file"),
+  airportController.uploadAirportsByFile
+);
 
-// module.exports = router;
+module.exports = router;

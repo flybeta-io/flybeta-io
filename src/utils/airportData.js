@@ -1,7 +1,6 @@
 const fs = require("fs");
 const csv = require("csv-parser");
-const Airport = require("../models/airport");
-
+const Airport = require("../models/Airport");
 
 // --- Validation ---
 const validateAirportData = (airportData) => {
@@ -27,7 +26,6 @@ const validateAirportData = (airportData) => {
 
   return errors;
 };
-
 
 // --- Ensure uploads folder exists ---
 if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
@@ -105,30 +103,18 @@ exports.uploadAirportsToDB = async (req, res) => {
       }
     }
 
-    if (savedAirports.length === 0 && errors.length > 0)
-      throw new Error("No valid airport data to save");
-    if (savedAirports.length != 0) {
-      console.log(`Successfully saved ${savedAirports.length} airports.`);
-      res.status(201).json({
-        message: `Successfully saved ${savedAirports.length} airports.`,
-        savedAirports,
-        errors,
-      });
-    }
-    res.status(400).json({ message: "No valid airport data to save", errors });
-
+    
     fs.unlinkSync(filePath);
-    return { savedAirports, errors, icaoCodes, iataCodes };
+    return { savedAirports, errors };
   } catch (error) {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     // throw new Error(error.message);
+    console.error("Error processing airport data: ", error);
     return res
       .status(500)
       .json({ message: "Error saving airport data", error });
   }
 };
-
-
 
 //Fetch Airport ICAO codes and IATA codes from the database
 exports.fetchAllAirportsICAOandIATAcodesfromDB = async () => {
@@ -145,7 +131,6 @@ exports.fetchAllAirportsICAOandIATAcodesfromDB = async () => {
     return [];
   }
 };
-
 
 // Fetch Airport Coordinates from the database by ICAO codes
 exports.fetchAirportCoordinatesByICAO = async (icao_codes) => {
@@ -175,7 +160,6 @@ exports.fetchAirportCoordinatesByICAO = async (icao_codes) => {
   }
 };
 
-
 //Fetch Airport Coordinates from the database by IATA codes
 exports.fetchAirportCoordinatesByIATA = async (iata_codes) => {
   //Pass in an array of multiple iata_codes and return an array - Query Data
@@ -204,5 +188,19 @@ exports.fetchAirportCoordinatesByIATA = async (iata_codes) => {
     return result;
   } catch (error) {
     console.error("Error fetching coordinates: ", error);
+  }
+};
+
+// Save all fetched airport records in bulk
+exports.saveAirportData = async (airportData) => {
+  try {
+    const savedAirports = await Airport.bulkCreate(airportData, {
+      validate: true,
+    });
+    console.log(`Successfully saved ${savedAirports.length} airports.`);
+    return savedAirports;
+  } catch (error) {
+    console.error("Error saving airport data: ", error);
+    throw new Error("Error saving airport data");
   }
 };
