@@ -29,7 +29,7 @@ const saveWeatherData = async (weatherData) => {
 };
 
 /** Get the most recent saved datetime for a specific ICAO code */
-const getLastSavedDateForICAO = async (icao_code) => {
+const getLastSavedWeatherDateForICAO = async (icao_code) => {
   try {
     const record = await Weather.findOne({
       where: { icao_code },
@@ -62,7 +62,7 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
   }
 
   // Determine resume point
-  const lastSavedDate = await getLastSavedDateForICAO(icao_code);
+  const lastSavedDate = await getLastSavedWeatherDateForICAO(icao_code);
   if (lastSavedDate) {
     console.log(`⏩ Resuming ${icao_code} from ${lastSavedDate.toISOString()}`);
   }
@@ -87,11 +87,8 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
         const { data } = await axios.get(url);
         if (!data.days) continue;
 
-        // console.log("🔍 Sample day data:", data.days?.[0]);
-
         for (const day of data.days) {
           for (const hour of day.hours) {
-            // console.log("🔍 Sample hour data:", hour);
 
             const newRecord = {
               location: data.resolvedAddress,
@@ -118,7 +115,7 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
         await delay(REQUEST_DELAY_MS); // avoid API throttling
       } catch (err) {
         console.error(
-          ` Error fetching ${icao_code} (${start}–${end}):`,
+          ` Error fetching ${icao_code} (${start}→${end}):`,
           err.message
         );
       }

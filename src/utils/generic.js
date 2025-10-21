@@ -1,17 +1,33 @@
 /** Generate a single date chunk for the past N days */
-exports.generateDailyChunk = (days) => {
-  const end = new Date();
-  let start = new Date();
-  start.setDate(end.getDate() - days);
-  return [
-    {
+exports.generateDailyChunk = (daysBack) => {
+  const now = new Date();
+  const endDate = now;
+  let startDate = new Date(now);
+  startDate.setDate(now.getDate() - daysBack);
+
+  const chunks = [];
+  let current = new Date(startDate);
+
+  while (current < endDate) {
+    const start = new Date(current);
+    const next = new Date(current);
+    next.setDate(current.getDate() + 30); // 30-day chunk
+
+    // make sure we don't go beyond "now"
+    const end = next > endDate ? endDate : next;
+
+    chunks.push({
       start: start.toISOString().split("T")[0],
       end: end.toISOString().split("T")[0],
-    },
-  ];
+    });
+
+    current = next;
+  }
+
+  return chunks;
 };
 
-/** Generate yearly chunks going backward from today */
+/** Generate monthly chunks going backward from today */
 exports.generateDynamicYearChunks = (yearsBack) => {
   const now = new Date();
   const endDate = now;
@@ -24,7 +40,7 @@ exports.generateDynamicYearChunks = (yearsBack) => {
   while (current < endDate) {
     const start = new Date(current);
     const next = new Date(current);
-    next.setMonth(current.getMonth() + 4); // move forward 3 months
+    next.setMonth(current.getMonth() + 12); // move forward 12 months
 
     // make sure we don't go beyond "now"
     const end = next > endDate ? endDate : next;
