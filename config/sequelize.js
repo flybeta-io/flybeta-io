@@ -16,7 +16,7 @@ const sequelize = new Sequelize(POSTGRES_DB_URL, {
     max: 20,
     min: 0,
     acquire: 30000,
-    idle: 10000,
+    idle: 60000,
   },
   logging: false,
 });

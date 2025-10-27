@@ -6,6 +6,7 @@ require("dotenv").config();
 const API_KEY = process.env.VISUAL_CROSSING_API_KEY;
 const BASE_URL =
   "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline";
+const DB_BATCH_SIZE = 1000;
 
 const REQUEST_DELAY_MS = 500; // rate-limit delay between API calls
 
@@ -53,13 +54,10 @@ const getLastSavedWeatherDateForICAO = async (icao_code) => {
 exports.fetchandSaveWeatherDataForEachAirport = async (
   icao_code,
   iata_code,
+  latitude_deg,
+  longitude_deg,
   chunks
 ) => {
-  const coords = await fetchAirportCoordinatesByICAO([icao_code]);
-  if (!coords || !coords.length) {
-    console.warn(` No coordinates found for ICAO code: ${icao_code}`);
-    return;
-  }
 
   // Determine resume point
   const lastSavedDate = await getLastSavedWeatherDateForICAO(icao_code);
@@ -67,65 +65,73 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
     console.log(`⏩ Resuming ${icao_code} from ${lastSavedDate.toISOString()}`);
   }
 
-  for (const { latitude_deg, longitude_deg } of coords) {
-    const location = `${latitude_deg},${longitude_deg}`;
-    let weatherData = [];
+  const location = `${latitude_deg},${longitude_deg}`;
+  let weatherData = [];
 
-    for (const { start, end } of chunks) {
-      if (lastSavedDate && new Date(end) <= lastSavedDate) continue;
+  for (const { start, end } of chunks) {
 
-      const chunkStart =
-        lastSavedDate && new Date(start) < lastSavedDate
-          ? lastSavedDate.toISOString().split("T")[0]
-          : start;
+    // if (lastSavedDate) {
+    //   console.log(`Skipping ${icao_code} ------------------`);
+    //   break;
+    // }
 
-      // Construct API URL
-      const url = `${BASE_URL}/${location}/${chunkStart}/${end}?unitGroup=metric&include=hours&key=${API_KEY}`;
-      console.log(` Fetching ${icao_code} (${chunkStart} → ${end})...`);
+    if (lastSavedDate && new Date(end) <= lastSavedDate) continue;
 
-      try {
-        const { data } = await axios.get(url);
-        if (!data.days) continue;
+    const chunkStart =
+      lastSavedDate && new Date(start) < lastSavedDate
+        ? lastSavedDate.toISOString().split("T")[0]
+        : start;
 
-        for (const day of data.days) {
-          for (const hour of day.hours) {
+    // Construct API URL
+    const url = `${BASE_URL}/${location}/${chunkStart}/${end}?unitGroup=metric&include=hours&key=${API_KEY}`;
+    console.log(` Fetching ${icao_code} (${chunkStart} → ${end})...`);
 
-            const newRecord = {
-              location: data.resolvedAddress,
-              iata_code,
-              icao_code,
-              datetime: new Date(`${day.datetime} ${hour.datetime}`), // hourly precision
-              visibility: hour.visibility ?? null,
-              precipitation: hour.precip ?? null,
-              precipitation_probability: hour.precipprob ?? null,
-              wind_speed: hour.windspeed ?? null,
-              wind_direction: hour.winddir ?? null,
-              temperature: hour.temp ?? null,
-              humidity: hour.humidity ?? null,
-              pressure: hour.pressure ?? null,
-              cloud_cover: hour.cloudcover ?? null,
-            };
+    try {
+      const { data } = await axios.get(url);
+      if (!data.days) continue;
 
-            weatherData.push(newRecord);
-          }
+      for (const day of data.days) {
+        for (const hour of day.hours) {
+          const newRecord = {
+            location: data.resolvedAddress,
+            iata_code,
+            icao_code,
+            datetime: new Date(`${day.datetime} ${hour.datetime}`), // hourly precision
+            visibility: hour.visibility ?? null,
+            precipitation: hour.precip ?? null,
+            precipitation_probability: hour.precipprob ?? null,
+            wind_speed: hour.windspeed ?? null,
+            wind_direction: hour.winddir ?? null,
+            temperature: hour.temp ?? null,
+            humidity: hour.humidity ?? null,
+            pressure: hour.pressure ?? null,
+            cloud_cover: hour.cloudcover ?? null,
+          };
+
+          weatherData.push(newRecord);
         }
+      }
+      if (weatherData.length >= DB_BATCH_SIZE) {
+        console.log(`  → Fetched ${weatherData.length} weather data.`);
         await saveWeatherData(weatherData);
         weatherData = [];
-
-        await delay(REQUEST_DELAY_MS); // avoid API throttling
-      } catch (err) {
-        console.error(
-          ` Error fetching ${icao_code} (${start}→${end}):`,
-          err.message
-        );
       }
-    }
 
-    if (weatherData.length > 0) {
-      await saveWeatherData(weatherData);
-      console.log(` Remaining records saved for ${icao_code}`);
+      await delay(REQUEST_DELAY_MS); // avoid API throttling
+    } catch (err) {
+      console.error(
+        ` Error fetching ${icao_code} (${start}→${end}):`,
+        err.message
+      );
+      break;
     }
-
-    await delay(REQUEST_DELAY_MS); // avoid API throttling between coords
   }
+
+  if (weatherData.length > 0) {
+    console.log(` ### Saving remaining records.`);
+    await saveWeatherData(weatherData);
+    console.log(` ### Remaining records saved.`);
+  }
+
+  await delay(REQUEST_DELAY_MS); // avoid API throttling between coords
 };

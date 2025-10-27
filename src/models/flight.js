@@ -18,6 +18,10 @@ const Flight = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    airlineIcaoCode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
     airlineIataCode: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -46,6 +50,10 @@ const Flight = sequelize.define(
     },
     delay: {
       type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    status: {
+      type: DataTypes.STRING,
       allowNull: true,
     },
   },

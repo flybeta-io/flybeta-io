@@ -1,6 +1,19 @@
 const fs = require("fs");
 const csv = require("csv-parser");
 const Airport = require("../models/Airport");
+const { Op } = require("sequelize");
+const { default: axios } = require("axios");
+require("dotenv").config();
+const {
+  allAirportsICAOCodeInDB,
+  allAirportsIATACodeInDB,
+} = require("./generic");
+
+const Api_key = process.env.AVIATION_EDGE_API_KEY;
+const airportsBaseUrl = "https://aviation-edge.com/v2/public/airportDatabase";
+
+const REQUEST_DELAY_MS = 500;
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // --- Validation ---
 const validateAirportData = (airportData) => {
@@ -103,7 +116,6 @@ exports.uploadAirportsToDB = async (req, res) => {
       }
     }
 
-    
     fs.unlinkSync(filePath);
     return { savedAirports, errors };
   } catch (error) {
@@ -116,83 +128,92 @@ exports.uploadAirportsToDB = async (req, res) => {
   }
 };
 
-//Fetch Airport ICAO codes and IATA codes from the database
-exports.fetchAllAirportsICAOandIATAcodesfromDB = async () => {
+// Fetch all Airports relevant details - icao_code, iata_code, lat, long - from DB
+exports.fetchAirportsDatafromDB = async () => {
   try {
     const airports = await Airport.findAll({
-      attributes: ["icao_code", "iata_code"],
+      attributes: ["icao_code", "iata_code", "latitude_deg", "longitude_deg"],
+      raw: true,
     });
-    return airports.map((a) => ({
-      icao_code: a.icao_code,
-      iata_code: a.iata_code,
-    }));
+    return airports;
   } catch (error) {
-    console.error("Error fetching ICAO codes: ", error);
+    console.error("Error fetching airport data: ", error);
     return [];
   }
-};
+}
 
-// Fetch Airport Coordinates from the database by ICAO codes
-exports.fetchAirportCoordinatesByICAO = async (icao_codes) => {
-  //Pass in an array of multiple icao_codes and return an array - Query Data
-  try {
-    if (!Array.isArray(icao_codes) || icao_codes.length === 0) {
-      console.log("No ICAO codes provided");
-      return [];
-    }
+// //Fetch Airport ICAO codes and IATA codes from the database
+// exports.fetchAllAirportsICAOandIATAcodesfromDB = async () => {
+//   try {
+//     const airports = await Airport.findAll({
+//       attributes: ["icao_code", "iata_code"],
+//       raw: true,
+//     });
+//     return airports;
+//   } catch (error) {
+//     console.error("Error fetching ICAO codes: ", error);
+//     return [];
+//   }
+// };
 
-    const airports = await Airport.findAll({
-      where: {
-        icao_code: icao_codes,
-      },
-      attributes: ["icao_code", "latitude_deg", "longitude_deg"],
-    });
+// // Fetch Airport Coordinates from the database by ICAO codes
+// exports.fetchAirportCoordinatesByICAO = async (icao_codes) => {
+//   //Pass in an array of multiple icao_codes and return an array - Query Data
+//   try {
+//     if (!Array.isArray(icao_codes) || icao_codes.length === 0) {
+//       console.log("No ICAO codes provided");
+//       return [];
+//     }
 
-    if (!airports.length) {
-      console.log("No airports found");
-      return [];
-    }
+//     const airports = await Airport.findAll({
+//       where: {
+//         icao_code: { [Op.in]: icao_codes },
+//       },
+//       attributes: ["icao_code", "latitude_deg", "longitude_deg"],
+//       raw: true,
+//     });
 
-    const result = airports.map((a) => a.dataValues);
-    return result;
-  } catch (error) {
-    console.error("Error fetching coordinates: ", error);
-  }
-};
+//     if (!airports.length) {
+//       console.log("No airports found");
+//       return [];
+//     }
+//     return airports;
+//   } catch (error) {
+//     console.error("Error fetching coordinates: ", error);
+//   }
+// };
 
-//Fetch Airport Coordinates from the database by IATA codes
-exports.fetchAirportCoordinatesByIATA = async (iata_codes) => {
-  //Pass in an array of multiple iata_codes and return an array - Query Data
-  try {
-    if (!Array.isArray(iata_codes) || iata_codes.length === 0) {
-      console.log("No IATA codes provided");
-      return [];
-    }
+// //Fetch Airport Coordinates from the database by IATA codes
+// exports.fetchAirportCoordinatesByIATA = async (iata_codes) => {
+//   //Pass in an array of multiple iata_codes and return an array - Query Data
+//   try {
+//     if (!Array.isArray(iata_codes) || iata_codes.length === 0) {
+//       console.log("No IATA codes provided");
+//       return [];
+//     }
 
-    const airports = await Airport.findAll({
-      where: {
-        iata_code: {
-          [Op.in]: iata_codes,
-        },
-      },
-      attributes: ["iata_code", "latitude_deg", "longitude_deg"],
-    });
+//     const airports = await Airport.findAll({
+//       where: {
+//         iata_code: {
+//           [Op.in]: iata_codes,
+//         },
+//       },
+//       attributes: ["iata_code", "latitude_deg", "longitude_deg"],
+//       raw: true,
+//     });
 
-    if (!airports.length) {
-      console.log("No airports found");
-      return [];
-    }
-
-    const result = airports.map((a) => a.dataValues);
-    console.log(result);
-    return result;
-  } catch (error) {
-    console.error("Error fetching coordinates: ", error);
-  }
-};
+//     if (!airports.length) {
+//       console.log("No airports found");
+//       return [];
+//     }
+//     return airports;
+//   } catch (error) {
+//     console.error("Error fetching coordinates: ", error);
+//   }
+// };
 
 // Save all fetched airport records in bulk
-exports.saveAirportData = async (airportData) => {
+const saveAirportData = async (airportData) => {
   try {
     const savedAirports = await Airport.bulkCreate(airportData, {
       validate: true,
@@ -204,3 +225,96 @@ exports.saveAirportData = async (airportData) => {
     throw new Error("Error saving airport data");
   }
 };
+
+// Fetch airports by Iso2Country and save to DB
+exports.fetchandSaveAirportsToDB = async (Iso2Country) => {
+  try {
+    const url = `${airportsBaseUrl}?key=${Api_key}&codeIso2Country=${Iso2Country}`;
+    const response = await axios.get(url);
+    const airports = response.data;
+
+    const icaoCodesfromDB = await allAirportsICAOCodeInDB();
+    const iataCodesfromDB = await allAirportsIATACodeInDB();
+    let airportsData = [];
+
+    for (const airport of airports) {
+      if (
+        icaoCodesfromDB.includes(airport.codeIcaoAirport) ||
+        iataCodesfromDB.includes(airport.codeIataAirport)
+      ) {
+        console.log(`Skipping existing airport ${airport.nameAirport}`);
+        continue;
+      }
+
+      if (
+        !(
+          airport.nameAirport &&
+          airport.codeIataAirport &&
+          airport.codeIcaoAirport &&
+          airport.latitudeAirport &&
+          airport.longitudeAirport &&
+          airport.Iso2Country
+        )
+      ) {
+        console.log(`Skipping incomplete airport ${airport.nameAirport}`);
+        continue;
+      }
+
+      const airportRecord = {
+        name: airport.nameAirport,
+        icao_code: airport.codeIcaoAirport.toUpperCase(),
+        iata_code: airport.codeIataAirport.toUpperCase(),
+        latitude_deg: airport.latitudeAirport,
+        longitude_deg: airport.longitudeAirport,
+        country_code: airport.codeIso2Country.toUpperCase(),
+      };
+
+      airportsData.push(airportRecord);
+    }
+
+    await saveAirportData(airportsData);
+    airportsData = [];
+    await delay(REQUEST_DELAY_MS);
+  } catch (error) {
+    console.error(`Error Saving Airports for ${Iso2Country}:`, error.message);
+  }
+};
+
+
+// exports.fetchandSaveCountryISO2CountryCode = async () => {
+//   try {
+//     const iataCodes = await allAirportsIATACodeInDB();
+//     console.log("IATA Codes: ", iataCodes);
+
+//     const nullCodes = [];   //Code that fail
+
+//     for (const code of iataCodes) {
+//       try {
+//         const url = `${airportsBaseUrl}?key=${Api_key}&codeIataAirport=${code}`;
+//         const response = await axios.get(url);
+//         const airportData = response.data?.[0];
+
+//         if (!airportData) {
+//           console.warn(`No airport data found for IATA code: ${code}`);
+//           continue;
+//         }
+
+//         let countryCode = airportData.codeIso2Country
+//         console.log(`Saving Country for Airport: ${code}`);
+//         await Airport.update({ country_code: `${countryCode}` },
+//           {where: {iata_code: code}}
+//         );
+//         console.log(`Successfully Saved ${countryCode} to ${code}`);
+
+//         await delay(1000); // avoid hitting API rate limits
+//       } catch (err) {
+//         console.error(`Error processing IATA code ${code}:`, err.message);
+//         nullCodes.push(code)
+//         continue; // move on to next airport
+//       }
+//     }
+//     console.log(nullCodes);
+//   } catch (err) {
+//     console.error("Unexpected error fetching IATA codes:", err.message);
+//   }
+// };

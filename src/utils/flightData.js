@@ -1,11 +1,14 @@
 const Flight = require("../models/flight");
 const axios = require("axios");
 require("dotenv").config();
-const { fetchAllAirportsICAOandIATAcodesfromDB } = require("./airportData");
 
 const API_KEY = process.env.AVIATION_EDGE_API_KEY;
 const FLIGHTS_HISTORY_BASE_URL = `https://aviation-edge.com/v2/public/flightsHistory?key=${API_KEY}`;
 const REQUEST_DELAY_MS = 500; // rate-limit delay between API calls
+const DB_BATCH_SIZE = 1000;
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 
 /* ------------------------- Helper Utility Functions ------------------------ */
 
@@ -14,7 +17,7 @@ const saveFlightData = async (flightData) => {
   try {
     console.log(" Saving flight data...");
     if (!Array.isArray(flightData) || flightData.length === 0) {
-      console.warn("No flight data to save.");
+      console.warn("No flight data to save:", flightData);
       return;
     }
     await Flight.bulkCreate(flightData, { ignoreDuplicates: true });
@@ -24,8 +27,6 @@ const saveFlightData = async (flightData) => {
   }
 };
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 // Function that takes in (2025-10-17t11:20:00.000) and returns new Date(2025-10-17 11:20:00.000)
 const refineDate = async (value) => {
   if (!value) return null;
@@ -34,16 +35,7 @@ const refineDate = async (value) => {
   return new Date(refinedDateStr);
 };
 
-const allAirportsICAOCodeInDB = async () => {
-  try {
-    const airports = await fetchAllAirportsICAOandIATAcodesfromDB();
-    const icaoCodes = airports.map((a) => a.icao_code);
-    return icaoCodes;
-  } catch (err) {
-    console.error("Error fetching ICAO codes", err);
-  }
-};
-
+// Get the last saved date for IATA Code
 const getLastSavedFlightDateForIATA = async (originAirportIata) => {
   try {
     const record = await Flight.findOne({
@@ -67,6 +59,7 @@ const getLastSavedFlightDateForIATA = async (originAirportIata) => {
 exports.fetchandSaveDepartureFlightsForEachAirport = async (
   icao_code,
   iata_code,
+  icaoCodesInDB,
   chunks
 ) => {
   let flightData = [];
@@ -78,9 +71,6 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
   const fourDaysAgoStr = fourDaysAgo.toISOString().split("T")[0];
   console.log(" Four days ago date:", fourDaysAgoStr);
 
-  const icaoCodesInDB = await allAirportsICAOCodeInDB();
-  console.log(icaoCodesInDB);
-
   // Determine resume point
   const lastSavedDate = await getLastSavedFlightDateForIATA(iata_code);
   if (lastSavedDate) {
@@ -88,7 +78,6 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
   }
 
   for (let { start, end } of chunks) {
-    // const chunkStart = start;
 
     // Convert chunkStart/end to Date for comparison
     const chunkStartDate = new Date(start);
@@ -124,21 +113,23 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
 
       for (const flight of flights) {
         //Skip if destination ICAO code is missing in Airport DB
-        if (icaoCodesInDB.includes(flight.arrival.icaoCode.toUpperCase())) {
+        if (icaoCodesInDB.has(flight.arrival.icaoCode.toUpperCase())) {
           const flightRecord = {
             flightID: flight.flight.iataNumber.toUpperCase(),
             airlineName: flight.airline.name.toUpperCase(),
+            airlineIcaoCode: flight.airline.icaoCode.toUpperCase(),
             airlineIataCode: flight.airline.iataCode.toUpperCase(),
             scheduledDepartureTime:
-              (await refineDate(flight.departure.scheduledTime)) || null,
+              (await refineDate(flight.departure.scheduledTime)),
             actualDepartureTime:
               (await refineDate(flight.departure.actualTime)) || null,
             scheduledArrivalTime:
               (await refineDate(flight.arrival.scheduledTime)) || null,
-            originAirportIata: flight.departure.iataCode.toUpperCase() || null,
+            originAirportIata: flight.departure.iataCode.toUpperCase(),
             destinationAirportIata:
-              flight.arrival.iataCode.toUpperCase() || null,
+              flight.arrival.iataCode.toUpperCase(),
             delay: flight.departure.delay || null,
+            status: flight.status || null,
           };
           flightData.push(flightRecord);
         } else {
@@ -149,9 +140,11 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
         }
       }
 
-      console.log(`  → Fetched ${flights.length} flights.`);
-      await saveFlightData(flightData);
-      flightData = [];
+      if (flightData.length >= DB_BATCH_SIZE){
+        console.log(`  → Fetched ${flights.length} flights.`);
+        await saveFlightData(flightData);
+        flightData = [];
+      };
 
       await delay(REQUEST_DELAY_MS); // avoid API throttling
     } catch (error) {
@@ -159,7 +152,16 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
         `  Error fetching flights for ${iata_code}:`,
         error.message
       );
+      console.error(`------- Skipping ${iata_code}`)
+      break;
     }
+
+    if (flightData.length > 0) {
+      console.log(` ## Saving remaining records`);
+      await saveFlightData(flightData);
+      console.log(` ## Remaining records saved for`);
+    }
+
     await delay(REQUEST_DELAY_MS);
   }
 };

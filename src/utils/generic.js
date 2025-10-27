@@ -1,3 +1,5 @@
+const Airport = require("../models/Airport");
+
 /** Generate a single date chunk for the past N days */
 exports.generateDailyChunk = (daysBack) => {
   const now = new Date();
@@ -54,4 +56,30 @@ exports.generateDynamicYearChunks = (yearsBack) => {
   }
 
   return chunks;
+};
+
+exports.allAirportsICAOCodeInDB = async () => {
+  try {
+    const icaoCodes = await Airport.findAll({
+      attributes: ["icao_code"],
+      raw: true,
+    });
+    const results = icaoCodes.map((a) => a.icao_code);
+    return results;
+  } catch (err) {
+    console.error("Error fetching ICAO codes", err);
+  }
+};
+
+exports.allAirportsIATACodeInDB = async () => {
+  try {
+    const iataCodes = await Airport.findAll({
+      attributes: ["iata_code"],
+      raw: true,
+    });
+    const results = iataCodes.map((a) => a.iata_code);
+    return results;
+  } catch (err) {
+    console.error("Error fetching IATA codes", err);
+  }
 };

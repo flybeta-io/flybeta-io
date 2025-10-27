@@ -13,7 +13,10 @@ const Airport = sequelize.define(
     name: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      unique: true,
+    },
+    country_code: {
+      type: DataTypes.STRING(2),
+      allowNull: false
     },
     icao_code: {
       type: DataTypes.STRING(4),
@@ -40,10 +43,6 @@ const Airport = sequelize.define(
         min: -180,
         max: 180,
       },
-    },
-    type: {
-      type: DataTypes.STRING(100),
-      allowNull: false,
     },
   },
   {

@@ -25,6 +25,7 @@
     "json2csv": "^6.0.0-alpha.2",
     "mongoose": "^8.19.1",
     "multer": "^2.0.2",
+    "node-cache": "^5.1.2",
     "p-limit": "^2.3.0",
     "pg": "^8.11.3",
     "sequelize": "^6.37.7"
