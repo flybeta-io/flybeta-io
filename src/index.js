@@ -23,23 +23,11 @@ app.listen(PORT, async () => {
     console.log("Database connection has been established successfully");
     console.log(`Server is listening on port ${PORT}`);
 
-    // (async () => {
-    //   try {
-    //     console.log("Fetching newFlights past 1 year data");
-    //     await fetchAndSaveNewFlights({ days: 365 });
-    //     console.log("✅ 1-year newFlight date fetch completed successfully");
-    //   } catch (error) {
-    //     console.error("❌ newFlight data fetch failed: ", error);
-    //   }
-    // })();
+    // Saving missing ICAO codes
 
     (async () => {
       try {
         console.log("Starting sequential background data fetch...");
-
-        // console.log("Fetching newFlights past 1 year data");
-        // await fetchAndSaveNewFlights({ days: 365 });
-        // console.log("✅ 1-year newFlight date fetch completed successfully");
 
         // 1️⃣ Fetch past 1 year of weather data first
         console.log("Starting 1-year weather data fetch...");
@@ -51,13 +39,17 @@ app.listen(PORT, async () => {
         await fetchAndSaveFlights({ days: 360 });
         console.log(" ✅ 360-day flight data fetch completed successfully");
 
+        //
+        console.log("Fetching newFlights past 1 year data");
+        await fetchAndSaveNewFlights({ days: 365 });
+        console.log("✅ 1-year newFlight date fetch completed successfully");
+
         console.log("✅ All background fetches completed successfully.");
       } catch (err) {
         // console.error("❌ Flight data fetch failed: ", err.message);
         console.error("❌ Background data fetch sequence failed:", err.message);
       }
     })();
-
   } catch (error) {
     console.error(`Unable to connect to the database ${error}`);
   }

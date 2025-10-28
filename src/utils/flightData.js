@@ -1,6 +1,7 @@
 const Flight = require("../models/flight");
 const axios = require("axios");
 require("dotenv").config();
+const { Op, Sequelize } = require("sequelize");
 
 const API_KEY = process.env.AVIATION_EDGE_API_KEY;
 const FLIGHTS_HISTORY_BASE_URL = `https://aviation-edge.com/v2/public/flightsHistory?key=${API_KEY}`;
@@ -184,4 +185,27 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
     fetchedFlights = 0;
   }
 
+};
+
+
+exports.fetchFlightDatafromDB = async () => {
+  try {
+    const flights = await Flight.findAll({
+      attributes: [
+        "airlineIcaoCode",
+        [Sequelize.literal('ANY_VALUE("airlineIataCode")'), "airlineIataCode"],
+      ],
+      where: {
+        airlineIcaoCode: { [Op.ne]: null },
+        airlineIataCode: { [Op.ne]: null },
+      },
+      group: ["airlineIcaoCode"],
+      raw: true,
+    });
+
+    return flights;
+  } catch (error) {
+    console.error("Error fetching flight data:", error);
+    return [];
+  }
 };

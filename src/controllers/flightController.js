@@ -2,6 +2,8 @@ const { fetchandSaveDepartureFlightsForEachAirport} = require("../utils/flightDa
 const { generateDailyChunk, generateDynamicYearChunks } = require("../utils/generic");
 const { fetchAirportsDatafromDB } = require('../utils/airportData');
 const { getAirportsCache } = require('../utils/cache');
+const Flight = require("../models/flight");
+const { fetchFlightDatafromDB } = require("../utils/flightData");
 
 
 /* ----------------------------- Main Controller ----------------------------- */
@@ -53,3 +55,33 @@ exports.fetchAndSaveFlights = async ({ days = null, years = null }) => {
 
   console.log("✅ All flight data fetched and saved successfully.");
 };
+
+
+
+// Save the missing airport IcaoCodes in DB
+exports.saveMissingIcaoCodes = async () => {
+  console.log('Saving Missing Flight Icao Codes');
+  const flights = await getAirportsCache(fetchFlightDatafromDB());
+
+  if (!flights.length) {
+    console.warn(" No flight found in database.");
+    return;
+  }
+
+  for (const flight of flights) {
+    try {
+      console.log(`Saving ICAO code: ${flight.airlineIcaoCode}`);
+      await Flight.update(
+        { airlineIcaoCode: `${flight.airlineIcaoCode}` },
+        { where: { airlineIataCode: `${flight.airlineIataCode}` } }
+      );
+    } catch (error) {
+      console.error(
+        `Error saving ICAO code: ${flight.airlineIcaoCode} => ${error}`
+      );
+    }
+  }
+
+  console.log(`All ICAO codes saved successfully`);
+
+}
