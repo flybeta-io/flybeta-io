@@ -16,43 +16,54 @@ const { getAirportsCache } = require('../utils/cache');
  * Fetch weather data for all ICAO codes.
  * Supports both { days } and { years } modes.
  */
-exports.fetchWeatherDataAndSaveToDB = async ({ days = null, years = null }) => {
+exports.fetchAndSaveWeather = async ({ days = null, years = null }) => {
   // const codes = (await fetchAllAirportsICAOandIATAcodesfromDB()).reverse();
   try {
     console.log(`Fetching Airports Data for Weather Operation`);
-    const airports = (await getAirportsCache(fetchAirportsDatafromDB()));
+    const airports = await getAirportsCache(fetchAirportsDatafromDB());
 
-  if (!airports.length) {
-    console.warn(" No ICAO codes found in database.");
-    return;
-  }
+    if (!airports.length) {
+      console.warn(" No ICAO codes found in database.");
+      return;
+    }
 
-  console.log(` Fetching weather for ${airports.length} airports...`);
+    console.log(` Fetching weather for ${airports.length} airports...`);
 
-  // Determine chunks
-  let chunks = [];
-  if (days) {
-    chunks = generateDailyChunk(days);
-    console.log(`→ Mode: Past ${days} days`);
-  } else if (years) {
-    chunks = generateDynamicYearChunks(years);
-    console.log(`→ Mode: Past ${years} year(s) (chunked by month)`);
-  } else {
-    throw new Error("Specify either { days } or { years }");
-  }
+    // Determine chunks
+    let chunks = [];
+    if (days) {
+      chunks = generateDailyChunk(days);
+      console.log(`→ Mode: Past ${days} days`);
+    } else if (years) {
+      chunks = generateDynamicYearChunks(years);
+      console.log(`→ Mode: Past ${years} year(s) (chunked by month)`);
+    } else {
+      throw new Error("Specify either { days } or { years }");
+    }
 
     try {
-    // Sequentially process each airport code
-    for (const { icao_code, iata_code, latitude_deg, longitude_deg } of airports) {
-      console.log(`Processing Weather Data for ICAO Code: ${icao_code}`);
-      await fetchandSaveWeatherDataForEachAirport(icao_code, iata_code, latitude_deg, longitude_deg, chunks);
+      // Sequentially process each airport code
+      for (const {
+        icao_code,
+        iata_code,
+        latitude_deg,
+        longitude_deg,
+      } of airports) {
+        console.log(`Processing Weather Data for ICAO Code: ${icao_code}`);
+        await fetchandSaveWeatherDataForEachAirport(
+          icao_code,
+          iata_code,
+          latitude_deg,
+          longitude_deg,
+          chunks
+        );
       }
     } catch (err) {
       console.error(`Error processing weather data for ${icao_code}`);
-  }
+    }
 
-  console.log("✅ All weather data fetched and saved successfully.");
+    console.log("✅ All weather data fetched and saved successfully.");
   } catch (error) {
-    console.error(`Error in Weather Operation`)
+    console.error(`Error in Weather Operation:`, error);
   }
 };

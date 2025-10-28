@@ -59,6 +59,8 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
   chunks
 ) => {
 
+  let weatherData = [];
+
   // Determine resume point
   const lastSavedDate = await getLastSavedWeatherDateForICAO(icao_code);
   if (lastSavedDate) {
@@ -66,14 +68,9 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
   }
 
   const location = `${latitude_deg},${longitude_deg}`;
-  let weatherData = [];
 
   for (const { start, end } of chunks) {
 
-    // if (lastSavedDate) {
-    //   console.log(`Skipping ${icao_code} ------------------`);
-    //   break;
-    // }
 
     if (lastSavedDate && new Date(end) <= lastSavedDate) continue;
 
@@ -111,8 +108,11 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
           weatherData.push(newRecord);
         }
       }
+
       if (weatherData.length >= DB_BATCH_SIZE) {
-        console.log(`  → Fetched ${weatherData.length} weather data.`);
+        console.log(
+          `Valid Unsaved weatherData: ${weatherData.length} > DB_BATCH_SIZE: ${DB_BATCH_SIZE}`
+        );
         await saveWeatherData(weatherData);
         weatherData = [];
       }
@@ -123,15 +123,37 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
         ` Error fetching ${icao_code} (${start}→${end}):`,
         err.message
       );
+
+      console.error(
+        "Error fetching:",
+        err.response?.status,
+        err.response?.data
+      );
+
+      if (weatherData.length > 0) {
+        console.log(` ##.......... Saving remaining records.`);
+        console.log(`Valid remaining weatherData: ${weatherData.length}`);
+        await saveWeatherData(weatherData);
+        newFlightData = [];
+      }
+
+      if (err.response?.status === 429) {
+        console.log("⏳ Too many requests, waiting 60 seconds...");
+        await delay(60000);
+      }
+
+      console.error(`------- Skipping ${icao_code}`);
       break;
-    }
+    };
+
+    await delay(REQUEST_DELAY_MS);
   }
 
   if (weatherData.length > 0) {
-    console.log(` ### Saving remaining records.`);
+    console.log("##... Saving final records ............");
+    console.log(`Valid final weatherData: ${weatherData.length}`);
     await saveWeatherData(weatherData);
-    console.log(` ### Remaining records saved.`);
-  }
+    weatherData = [];
+  };
 
-  await delay(REQUEST_DELAY_MS); // avoid API throttling between coords
 };

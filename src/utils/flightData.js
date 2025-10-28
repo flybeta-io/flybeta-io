@@ -21,7 +21,7 @@ const saveFlightData = async (flightData) => {
       return;
     }
     await Flight.bulkCreate(flightData, { ignoreDuplicates: true });
-    console.log(` Saved ${flightData.length} flight records.`);
+    console.log(`✅ Saved ${flightData.length} flight records.`);
   } catch (error) {
     console.error(" Error saving flight data:", error.message);
   }
@@ -59,10 +59,11 @@ const getLastSavedFlightDateForIATA = async (originAirportIata) => {
 exports.fetchandSaveDepartureFlightsForEachAirport = async (
   icao_code,
   iata_code,
-  icaoCodesInDB,
+  iataCodesInDB,
   chunks
 ) => {
   let flightData = [];
+  let fetchedFlights = 0;
   //Check that end is atleast 4 days before today in this format (2025-10-20)
   const today = new Date();
   const fourDaysAgo = new Date();
@@ -111,9 +112,12 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
       const response = await axios.get(url);
       const flights = response.data;
 
+      fetchedFlights += flights.length;
+      // console.log(`  → Fetched ${flights.length} flights.`);
+
       for (const flight of flights) {
         //Skip if destination ICAO code is missing in Airport DB
-        if (icaoCodesInDB.has(flight.arrival.icaoCode.toUpperCase())) {
+        if (iataCodesInDB.has(flight.arrival.iataCode.toUpperCase())) {
           const flightRecord = {
             flightID: flight.flight.iataNumber.toUpperCase(),
             airlineName: flight.airline.name.toUpperCase(),
@@ -133,17 +137,18 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
           };
           flightData.push(flightRecord);
         } else {
-          //   console.warn(
-          //     ` Destination Airport not found in DB; Skipping flight ${flight.flight.iataNumber.toUpperCase()}.`
-          //   );
           continue;
         }
       }
 
       if (flightData.length >= DB_BATCH_SIZE){
-        console.log(`  → Fetched ${flights.length} flights.`);
+        console.log(`Total Fetched Flights: ${fetchedFlights}`);
+        console.log(
+          `Valid Unsaved flightData: ${flightData.length} > DB_BATCH_SIZE: ${DB_BATCH_SIZE}`
+        );
         await saveFlightData(flightData);
         flightData = [];
+        fetchedFlights = 0;
       };
 
       await delay(REQUEST_DELAY_MS); // avoid API throttling
@@ -152,16 +157,31 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
         `  Error fetching flights for ${iata_code}:`,
         error.message
       );
-      console.error(`------- Skipping ${iata_code}`)
-      break;
-    }
+       console.error(
+         "Error fetching:",
+         error.response?.status,
+         error.response?.data
+       );
+       console.error(`------- Skipping ${iata_code}`);
 
-    if (flightData.length > 0) {
-      console.log(` ## Saving remaining records`);
-      await saveFlightData(flightData);
-      console.log(` ## Remaining records saved for`);
+       if (flightData.length > 0) {
+         console.log(` ##.......... Saving remaining records.`);
+         console.log(`Valid remaining flightData: ${flightData.length}`);
+         await saveFlightData(flightData);
+         flightData = [];
+         fetchedFlights = 0;
+       }
+      break;
     }
 
     await delay(REQUEST_DELAY_MS);
   }
+
+  if (flightData.length > 0) {
+    console.log(`Valid Unsaved flightData: ${flightData.length}`);
+    await saveFlightData(flightData);
+    flightData = [];
+    fetchedFlights = 0;
+  }
+
 };

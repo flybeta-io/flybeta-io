@@ -13,7 +13,7 @@ exports.generateDailyChunk = (daysBack) => {
   while (current < endDate) {
     const start = new Date(current);
     const next = new Date(current);
-    next.setDate(current.getDate() + 30); // 30-day chunk
+    next.setDate(current.getDate() + 14); // 14-day chunk
 
     // make sure we don't go beyond "now"
     const end = next > endDate ? endDate : next;

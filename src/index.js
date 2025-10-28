@@ -1,22 +1,21 @@
 require("dotenv").config();
 const express = require("express");
 const sequelize = require("../config/sequelize");
-const {
-  fetchWeatherDataAndSaveToDB,
-} = require("./controllers/weatherController");
-const {
-  fetchFlightsDataAndSaveToDB,
-} = require("./controllers/flightController");
-
+const { fetchAndSaveWeather } = require("./controllers/weatherController");
+const { fetchAndSaveFlights } = require("./controllers/flightController");
+const { fetchAndSaveNewFlights } = require("./controllers/newFlightController");
 
 const PORT = process.env.PORT || 5000;
 
-
+// Middleware
 const app = express();
 app.use(express.json());
 
+// Router
 const airportRoutes = require("./routes/airportsRoutes");
 app.use("/airports", airportRoutes);
+
+
 
 app.listen(PORT, async () => {
   try {
@@ -26,11 +25,11 @@ app.listen(PORT, async () => {
 
     // (async () => {
     //   try {
-    //     console.log("Starting 1-year weather data fetch...");
-    //   await fetchWeatherDataAndSaveToDB({ years: 1 });
-    //   console.log("✅ 1-year weather data fetch completed successfully");
-    //   } catch (err) {
-    //     console.error("❌ Weather data fetch failed: ", err.message);
+    //     console.log("Fetching newFlights past 1 year data");
+    //     await fetchAndSaveNewFlights({ days: 365 });
+    //     console.log("✅ 1-year newFlight date fetch completed successfully");
+    //   } catch (error) {
+    //     console.error("❌ newFlight data fetch failed: ", error);
     //   }
     // })();
 
@@ -38,14 +37,18 @@ app.listen(PORT, async () => {
       try {
         console.log("Starting sequential background data fetch...");
 
+        // console.log("Fetching newFlights past 1 year data");
+        // await fetchAndSaveNewFlights({ days: 365 });
+        // console.log("✅ 1-year newFlight date fetch completed successfully");
+
         // 1️⃣ Fetch past 1 year of weather data first
         console.log("Starting 1-year weather data fetch...");
-        await fetchWeatherDataAndSaveToDB({ years: 1 });
+        await fetchAndSaveWeather({ years: 1 });
         console.log("1-year weather data fetch completed successfully");
 
         // 2️⃣ Then fetch flight data for past 360 days
         console.log("Fetching past 360 days of flight data...");
-        await fetchFlightsDataAndSaveToDB({ days: 360 });
+        await fetchAndSaveFlights({ days: 360 });
         console.log(" ✅ 360-day flight data fetch completed successfully");
 
         console.log("✅ All background fetches completed successfully.");
@@ -54,7 +57,6 @@ app.listen(PORT, async () => {
         console.error("❌ Background data fetch sequence failed:", err.message);
       }
     })();
-
 
   } catch (error) {
     console.error(`Unable to connect to the database ${error}`);
