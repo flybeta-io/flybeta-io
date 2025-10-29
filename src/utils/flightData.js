@@ -130,6 +130,8 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
               (await refineDate(flight.departure.actualTime)) || null,
             scheduledArrivalTime:
               (await refineDate(flight.arrival.scheduledTime)) || null,
+            actualArrivalTime:
+              (await refineDate(flight.arrival.actualTime)) || null,
             originAirportIata: flight.departure.iataCode.toUpperCase(),
             destinationAirportIata:
               flight.arrival.iataCode.toUpperCase(),
@@ -142,8 +144,10 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
         }
       }
 
+      console.log(
+        `Ratio of Valid Flights: ${flightData.length}/${fetchedFlights}`
+      );
       if (flightData.length >= DB_BATCH_SIZE){
-        console.log(`Total Fetched Flights: ${fetchedFlights}`);
         console.log(
           `Valid Unsaved flightData: ${flightData.length} > DB_BATCH_SIZE: ${DB_BATCH_SIZE}`
         );
@@ -167,7 +171,7 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
 
        if (flightData.length > 0) {
          console.log(` ##.......... Saving remaining records.`);
-         console.log(`Valid remaining flightData: ${flightData.length}`);
+         console.log(`Remaining flightData: ${flightData.length}`);
          await saveFlightData(flightData);
          flightData = [];
          fetchedFlights = 0;
@@ -179,7 +183,8 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
   }
 
   if (flightData.length > 0) {
-    console.log(`Valid Unsaved flightData: ${flightData.length}`);
+     console.log("##... Saving final records ............");
+     console.log(`Final flightData: ${flightData.length}`);
     await saveFlightData(flightData);
     flightData = [];
     fetchedFlights = 0;

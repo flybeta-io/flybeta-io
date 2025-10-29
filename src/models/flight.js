@@ -38,6 +38,10 @@ const Flight = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    actualArrivalTime: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
     originAirportIata: {
       //Iata code
       type: DataTypes.STRING,
