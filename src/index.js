@@ -23,16 +23,15 @@ app.listen(PORT, async () => {
     console.log("Database connection has been established successfully");
     console.log(`Server is listening on port ${PORT}`);
 
-    // Saving missing ICAO codes
-
+    
     (async () => {
       try {
         console.log("Starting sequential background data fetch...");
 
-        // // 1️⃣ Fetch past 1 year of weather data first
-        // console.log("Starting 1-year weather data fetch...");
-        // await fetchAndSaveWeather({ years: 1 });
-        // console.log("1-year weather data fetch completed successfully");
+        // 1️⃣ Fetch past 1 year of weather data first
+        console.log("Starting 1-year weather data fetch...");
+        await fetchAndSaveWeather({ years: 1 });
+        console.log("1-year weather data fetch completed successfully");
 
         // 2️⃣ Then fetch flight data for past 360 days
         console.log("Fetching past 360 days of flight data...");
