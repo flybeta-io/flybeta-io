@@ -4,10 +4,8 @@ const Airport = require("../models/Airport");
 const { Op } = require("sequelize");
 const { default: axios } = require("axios");
 require("dotenv").config();
-const {
-  allAirportsICAOCodeInDB,
-  allAirportsIATACodeInDB,
-} = require("./generic");
+
+
 
 const Api_key = process.env.AVIATION_EDGE_API_KEY;
 const airportsBaseUrl = "https://aviation-edge.com/v2/public/airportDatabase";
@@ -140,7 +138,7 @@ exports.fetchAirportsDatafromDB = async () => {
     console.error("Error fetching airport data: ", error);
     return [];
   }
-}
+};
 
 // //Fetch Airport ICAO codes and IATA codes from the database
 // exports.fetchAllAirportsICAOandIATAcodesfromDB = async () => {
@@ -227,20 +225,22 @@ const saveAirportData = async (airportData) => {
 };
 
 // Fetch airports by Iso2Country and save to DB
-exports.fetchandSaveAirportsToDB = async (Iso2Country) => {
+exports.fetchandSaveAirportsToDB = async (
+  iso,
+  iataCodesInDB,
+  icaoCodesInDB
+) => {
   try {
-    const url = `${airportsBaseUrl}?key=${Api_key}&codeIso2Country=${Iso2Country}`;
+    const url = `${airportsBaseUrl}?key=${Api_key}&codeIso2Country=${iso}`;
     const response = await axios.get(url);
     const airports = response.data;
 
-    const icaoCodesfromDB = await allAirportsICAOCodeInDB();
-    const iataCodesfromDB = await allAirportsIATACodeInDB();
     let airportsData = [];
 
     for (const airport of airports) {
       if (
-        icaoCodesfromDB.includes(airport.codeIcaoAirport) ||
-        iataCodesfromDB.includes(airport.codeIataAirport)
+        icaoCodesInDB.has(airport.codeIcaoAirport) ||
+        iataCodesInDB.has(airport.codeIataAirport)
       ) {
         console.log(`Skipping existing airport ${airport.nameAirport}`);
         continue;

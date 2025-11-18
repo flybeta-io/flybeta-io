@@ -1,0 +1,58 @@
+services:
+
+  # backend:
+  #   image: flybeta-backend
+  #   build:
+  #     context: .
+  #     dockerfile: dockerfile
+  #   container_name: flybeta-app-backend
+  #   ports:
+  #     - 5000:5000
+  #   environment:
+  #     - "NODE_ENV=development"
+  #   networks:
+  #     - flybeta-network
+  #   depends_on:
+  #     - kafka
+  #     - kafka-ui
+  kafka:
+    image: apache/kafka:4.1.0
+    container_name: kafka
+    user: root
+    ports:
+      - "9092:9092"  # client connections
+      - "9093:9093"  # controller internal communication
+    environment:
+      KAFKA_KRAFT_MODE: "true"
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LOG_DIRS: "/kafka-logs"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/kafka-logs
+    networks:
+      - flybeta-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"  # access UI in browser
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "local"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:9092"
+      KAFKA_CLUSTERS_0_ZOOKEEPER: ""  # empty because KRaft mode
+    depends_on:
+      - kafka
+    networks:
+      - flybeta-network
+
+volumes:
+  kafka-data:
+
+networks:
+  flybeta-network:

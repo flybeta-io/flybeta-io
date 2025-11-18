@@ -33,7 +33,7 @@ exports.fetchAndSaveFlights = async ({ days = null, years = null }) => {
   }
 
   const iataCodesInDB = new Set(airports.map((a) => a.iata_code));
-  console.log(`Loaded ${iataCodesInDB.size} ICAO codes into memory.`);
+  console.log(`Loaded ${iataCodesInDB.size} IATA codes into memory.`);
 
   // Sequentially process each airport code
   for (const { icao_code, iata_code } of airports) {

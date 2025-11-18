@@ -2,6 +2,8 @@ const {
   uploadAirportsToDB,
   fetchandSaveAirportsToDB,
 } = require("../utils/airportData");
+const { getAirportsCache } = require("../utils/cache");
+const { fetchAirportsDatafromDB } = require("../utils/airportData");
 
 exports.uploadAirportsByFile = async (req, res) => {
   const { savedAirports, errors } = await uploadAirportsToDB(req, res);
@@ -25,14 +27,28 @@ exports.uploadAirportsByFile = async (req, res) => {
 exports.fetchAirportsbyISOandSavetoDB = async (req, res) => {
   const { ISOCodes } = req.body;
   if (ISOCodes.length === 0) {
-    return res.status(403).json({ message: 'ISO Code cannot be empty' });
+    return res.status(403).json({ message: "ISO Code cannot be empty" });
   }
+
+  console.log(`Fetching Airports Data for Flights Operation`);
+  const airports = await getAirportsCache(fetchAirportsDatafromDB());
+
+  if (!airports.length) {
+    console.warn(" No airport found in database.");
+    return;
+  }
+
+  const iataCodesInDB = new Set(airports.map((a) => a.iata_code));
+  console.log(`Loaded ${iataCodesInDB.size} IATA codes into memory.`);
+  const icaoCodesInDB = new Set(airports.map((a) => a.icao_code));
+  console.log(`Loaded ${icaoCodesInDB.size} ICAO codes into memory.`);
+
   // console.log('Iso Codes: ', ISOCodes)
   try {
-    for (code of ISOCodes) {
-      await fetchandSaveAirportsToDB(code);
+    for (iso of ISOCodes) {
+      await fetchandSaveAirportsToDB(iso, iataCodesInDB, icaoCodesInDB);
     }
-    console.log(`✅ All airports Saved Successfully`);
+    console.log(`✅ Airports fetching operation completed successfully`);
     return res.status(200).json({
       message: `Airports in countries ${ISOCodes} retrieved successfully`,
     });

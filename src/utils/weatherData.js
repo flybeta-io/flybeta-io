@@ -8,7 +8,7 @@ const BASE_URL =
   "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline";
 const DB_BATCH_SIZE = 1000;
 
-const REQUEST_DELAY_MS = 500; // rate-limit delay between API calls
+const REQUEST_DELAY_MS = 100; // rate-limit delay between API calls
 
 /* ------------------------- Helper Utility Functions ------------------------ */
 

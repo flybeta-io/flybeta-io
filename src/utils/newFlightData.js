@@ -4,7 +4,7 @@ require("dotenv").config();
 
 const API_KEY = process.env.FLIGHT_RADAR_API_KEY;
 const BASE_URL = `https://fr24api.flightradar24.com/api/flight-summary/full`;
-const REQUEST_DELAY_MS = 500; // rate-limit delay between API calls
+const REQUEST_DELAY_MS = 100; // rate-limit delay between API calls
 const DB_BATCH_SIZE = 1000;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

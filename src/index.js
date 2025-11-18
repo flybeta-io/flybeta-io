@@ -23,7 +23,7 @@ app.listen(PORT, async () => {
     console.log("Database connection has been established successfully");
     console.log(`Server is listening on port ${PORT}`);
 
-    
+
     (async () => {
       try {
         console.log("Starting sequential background data fetch...");
@@ -33,15 +33,12 @@ app.listen(PORT, async () => {
         await fetchAndSaveWeather({ years: 1 });
         console.log("1-year weather data fetch completed successfully");
 
+        await new Promise((resolve) => setTimeout(resolve, 5000)); // 5-second delay
+
         // 2️⃣ Then fetch flight data for past 360 days
         console.log("Fetching past 360 days of flight data...");
         await fetchAndSaveFlights({ days: 360 });
         console.log(" ✅ 360-day flight data fetch completed successfully");
-
-        // //
-        // console.log("Fetching newFlights past 1 year data");
-        // await fetchAndSaveNewFlights({ days: 365 });
-        // console.log("✅ 1-year newFlight date fetch completed successfully");
 
         console.log("✅ All background fetches completed successfully.");
       } catch (err) {

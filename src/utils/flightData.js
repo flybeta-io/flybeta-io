@@ -145,7 +145,7 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
       }
 
       console.log(
-        `Ratio of Valid Flights: ${flightData.length}/${fetchedFlights}`
+        `Fraction of Valid Flights: ${flightData.length}/${fetchedFlights}`
       );
       if (flightData.length >= DB_BATCH_SIZE){
         console.log(
