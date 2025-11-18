@@ -1,9 +1,11 @@
 require("dotenv").config();
 const express = require("express");
 const sequelize = require("../config/sequelize");
+const {run} = require("./eventStreaming");
 const { fetchAndSaveWeather } = require("./controllers/weatherController");
 const { fetchAndSaveFlights } = require("./controllers/flightController");
 const { fetchAndSaveNewFlights } = require("./controllers/newFlightController");
+
 
 const PORT = process.env.PORT || 5000;
 
@@ -16,6 +18,11 @@ const airportRoutes = require("./routes/airportsRoutes");
 app.use("/airports", airportRoutes);
 
 
+setTimeout(() => {
+  run().catch((e) => console.error(`[kafka-run] ${e.message}`, e));
+}, 10000); // Delay the Kafka run by 10 seconds
+
+
 
 app.listen(PORT, async () => {
   try {
@@ -26,21 +33,21 @@ app.listen(PORT, async () => {
 
     (async () => {
       try {
-        console.log("Starting sequential background data fetch...");
+        // console.log("Starting sequential background data fetch...");
 
-        // 1️⃣ Fetch past 1 year of weather data first
-        console.log("Starting 1-year weather data fetch...");
-        await fetchAndSaveWeather({ years: 1 });
-        console.log("1-year weather data fetch completed successfully");
+        // // 1️⃣ Fetch past 1 year of weather data first
+        // console.log("Starting 1-year weather data fetch...");
+        // await fetchAndSaveWeather({ years: 1 });
+        // console.log("1-year weather data fetch completed successfully");
 
-        await new Promise((resolve) => setTimeout(resolve, 5000)); // 5-second delay
+        // await new Promise((resolve) => setTimeout(resolve, 5000)); // 5-second delay
 
-        // 2️⃣ Then fetch flight data for past 360 days
-        console.log("Fetching past 360 days of flight data...");
-        await fetchAndSaveFlights({ days: 360 });
-        console.log(" ✅ 360-day flight data fetch completed successfully");
+        // // 2️⃣ Then fetch flight data for past 360 days
+        // console.log("Fetching past 360 days of flight data...");
+        // await fetchAndSaveFlights({ days: 360 });
+        // console.log(" ✅ 360-day flight data fetch completed successfully");
 
-        console.log("✅ All background fetches completed successfully.");
+        // console.log("✅ All background fetches completed successfully.");
       } catch (err) {
         // console.error("❌ Flight data fetch failed: ", err.message);
         console.error("❌ Background data fetch sequence failed:", err.message);
