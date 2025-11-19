@@ -1,9 +1,4 @@
-const {
-  fetchandSaveWeatherDataForEachAirport,
-} = require("../utils/weatherData");
-// const {
-//   fetchAllAirportsICAOandIATAcodesfromDB,
-// } = require("../utils/airportData");
+const { fetchSingleAirportWeatherData } = require("../utils/weatherData");
 const { generateDailyChunk, generateDynamicYearChunks } = require("../utils/generic");
 const { fetchAirportsDatafromDB } = require("../utils/airportData");
 const { getAirportsCache } = require('../utils/cache');
@@ -16,8 +11,7 @@ const { getAirportsCache } = require('../utils/cache');
  * Fetch weather data for all ICAO codes.
  * Supports both { days } and { years } modes.
  */
-exports.fetchAndSaveWeather = async ({ days = null, years = null }) => {
-  // const codes = (await fetchAllAirportsICAOandIATAcodesfromDB()).reverse();
+exports.fetchAllAirportsWeatherData = async ({ days = null, years = null }) => {
   try {
     console.log(`Fetching Airports Data for Weather Operation`);
     const airports = await getAirportsCache(fetchAirportsDatafromDB());
@@ -50,7 +44,7 @@ exports.fetchAndSaveWeather = async ({ days = null, years = null }) => {
         longitude_deg,
       } of airports) {
         console.log(`Processing Weather Data for ICAO Code: ${icao_code}`);
-        await fetchandSaveWeatherDataForEachAirport(
+        await fetchSingleAirportWeatherData(
           icao_code,
           iata_code,
           latitude_deg,

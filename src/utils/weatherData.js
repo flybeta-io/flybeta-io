@@ -1,33 +1,22 @@
-const { fetchAirportCoordinatesByICAO } = require("../utils/airportData");
 const axios = require("axios");
 const Weather = require("../models/weather");
 require("dotenv").config();
+const { sendMessage } = require('../events/producer');
+const { weatherTopic } = require("../../config/kafka");
+
 
 const API_KEY = process.env.VISUAL_CROSSING_API_KEY;
 const BASE_URL =
   "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline";
-const DB_BATCH_SIZE = 1000;
+const REQUEST_DELAY_MS = 2000; // rate-limit delay between API calls
 
-const REQUEST_DELAY_MS = 100; // rate-limit delay between API calls
+
 
 /* ------------------------- Helper Utility Functions ------------------------ */
 
 /** Sleep for rate limiting */
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Save multiple fetched weather records in bulk */
-const saveWeatherData = async (weatherData) => {
-  try {
-    if (!Array.isArray(weatherData) || weatherData.length === 0) {
-      console.warn("No weather data to save.");
-      return;
-    }
-    await Weather.bulkCreate(weatherData, { ignoreDuplicates: true });
-    console.log(`✅ Saved ${weatherData.length} weather records.`);
-  } catch (error) {
-    console.error(" Error saving weather data:", error.message);
-  }
-};
 
 /** Get the most recent saved datetime for a specific ICAO code */
 const getLastSavedWeatherDateForICAO = async (icao_code) => {
@@ -48,10 +37,27 @@ const getLastSavedWeatherDateForICAO = async (icao_code) => {
   }
 };
 
+
+/* --------------------- Saving Script -------------------------------------------*/
+
+exports.saveWeatherData = async (weatherData) => {
+  try {
+    if (!Array.isArray(weatherData) || weatherData.length === 0) {
+      console.warn("No weather data to save.");
+      return;
+    }
+    await Weather.bulkCreate(weatherData, { ignoreDuplicates: true });
+    console.log(`✅ Saved ${weatherData.length} weather records.`);
+  } catch (error) {
+    console.error(" Error saving weather data:", error.message);
+  }
+};
+
+
 /* --------------------------- Core Fetching Logic --------------------------- */
 
 /** Fetch and Save weather data for a single airport (by ICAO) */
-exports.fetchandSaveWeatherDataForEachAirport = async (
+exports.fetchSingleAirportWeatherData = async (
   icao_code,
   iata_code,
   latitude_deg,
@@ -109,12 +115,12 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
         }
       }
 
-      if (weatherData.length >= DB_BATCH_SIZE) {
-        console.log(
-          `Valid Unsaved weatherData: ${weatherData.length} > DB_BATCH_SIZE: ${DB_BATCH_SIZE}`
-        );
-        await saveWeatherData(weatherData);
-        weatherData = [];
+      console.log(`  ------→ Sending weather data of length ${weatherData.length} to topic.`);
+      if (weatherData.length > 0) {
+        // Send weather data to Kafka topic
+        await sendMessage(weatherTopic, weatherData);
+        console.log(`  → Sent ${weatherData.length} valid weather records to Kafka topic.`);
+        weatherData = []; // Clear after sending
       }
 
       await delay(REQUEST_DELAY_MS); // avoid API throttling
@@ -125,21 +131,23 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
       );
 
       console.error(
-        "Error fetching:",
+        `Error fetching weather data for ${icao_code}:`,
         err.response?.status,
         err.response?.data
       );
 
       if (weatherData.length > 0) {
-        console.log(` ##.......... Saving remaining records.`);
-        console.log(`Valid remaining weatherData: ${weatherData.length}`);
-        await saveWeatherData(weatherData);
-        newFlightData = [];
+        // Send weather data to Kafka topic
+        await sendMessage(weatherTopic, weatherData);
+        console.log(
+          `  → Sent ${weatherData.length} valid weather records to Kafka topic.`
+        );
+        weatherData = []; // Clear after sending
       }
 
       if (err.response?.status === 429) {
-        console.log("⏳ Too many requests, waiting 60 seconds...");
-        await delay(60000);
+        console.log("⏳ Too many requests, waiting 30 seconds...");
+        await delay(30000);
       }
 
       console.error(`------- Skipping ${icao_code}`);
@@ -150,10 +158,12 @@ exports.fetchandSaveWeatherDataForEachAirport = async (
   }
 
   if (weatherData.length > 0) {
-    console.log("##... Saving final records ............");
-    console.log(`Valid final weatherData: ${weatherData.length}`);
-    await saveWeatherData(weatherData);
-    weatherData = [];
-  };
+    // Send weather data to Kafka topic
+    await sendMessage(weatherTopic, weatherData);
+    console.log(
+      `  → Sent ${weatherData.length} valid weather records to Kafka topic.`
+    );
+    weatherData = []; // Clear after sending
+  }
 
 };

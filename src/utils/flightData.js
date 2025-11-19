@@ -2,31 +2,44 @@ const Flight = require("../models/flight");
 const axios = require("axios");
 require("dotenv").config();
 const { Op, Sequelize } = require("sequelize");
+const { sendMessage } = require('../events/producer');
+const { flightTopic } = require("../../config/kafka");
+
+
+/* ------------------------- Configuration Constants ------------------------- */
 
 const API_KEY = process.env.AVIATION_EDGE_API_KEY;
 const FLIGHTS_HISTORY_BASE_URL = `https://aviation-edge.com/v2/public/flightsHistory?key=${API_KEY}`;
-const REQUEST_DELAY_MS = 500; // rate-limit delay between API calls
-const DB_BATCH_SIZE = 1000;
+const REQUEST_DELAY_MS = 2000; // rate-limit delay between API calls
+
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 
 /* ------------------------- Helper Utility Functions ------------------------ */
 
-//Save multiple fetched flight records in bulk
-const saveFlightData = async (flightData) => {
+exports.fetchFlightDatafromDB = async () => {
   try {
-    console.log(" Saving flight data...");
-    if (!Array.isArray(flightData) || flightData.length === 0) {
-      console.warn("No flight data to save:", flightData);
-      return;
-    }
-    await Flight.bulkCreate(flightData, { ignoreDuplicates: true });
-    console.log(`✅ Saved ${flightData.length} flight records.`);
+    const flights = await Flight.findAll({
+      attributes: [
+        "airlineIcaoCode",
+        [Sequelize.literal('ANY_VALUE("airlineIataCode")'), "airlineIataCode"],
+      ],
+      where: {
+        airlineIcaoCode: { [Op.ne]: null },
+        airlineIataCode: { [Op.ne]: null },
+      },
+      group: ["airlineIcaoCode"],
+      raw: true,
+    });
+
+    return flights;
   } catch (error) {
-    console.error(" Error saving flight data:", error.message);
+    console.error("                    Error fetching flight data:", error);
+    return [];
   }
 };
+
 
 // Function that takes in (2025-10-17t11:20:00.000) and returns new Date(2025-10-17 11:20:00.000)
 const refineDate = async (value) => {
@@ -47,17 +60,39 @@ const getLastSavedFlightDateForIATA = async (originAirportIata) => {
     return record ? new Date(record.scheduledDepartureTime) : null;
   } catch (err) {
     console.error(
-      ` Error fetching last saved date for ${iata_code}:`,
+      `                    Error fetching last saved date for ${iata_code}:`,
       err.message
     );
     return null;
   }
 };
 
+/* --------------------- Saving Script -------------------------------------------*/
+
+//Save multiple fetched flight records in bulk
+exports.saveFlightData = async (flightData) => {
+  try {
+    // console.log(" Saving flight data...");
+    if (!Array.isArray(flightData) || flightData.length === 0) {
+      console.warn("                    No flight data to save:", flightData);
+      return;
+    }
+    await Flight.bulkCreate(flightData, { ignoreDuplicates: true });
+    console.log(
+      `                    ✅ Saved ${flightData.length} flight records.`
+    );
+  } catch (error) {
+    console.error(
+      "                    Error saving flight data:",
+      error.message
+    );
+  }
+};
+
 /* --------------------------- Core Fetching Logic --------------------------- */
 
 // // Fetch and Save flight data for a single airport (by IATA)
-exports.fetchandSaveDepartureFlightsForEachAirport = async (
+exports.fetchSingleAirportFlightData = async (
   icao_code,
   iata_code,
   iataCodesInDB,
@@ -71,12 +106,14 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
   fourDaysAgo.setDate(today.getDate() - 4);
 
   const fourDaysAgoStr = fourDaysAgo.toISOString().split("T")[0];
-  console.log(" Four days ago date:", fourDaysAgoStr);
+  console.log("                    Four days ago date:", fourDaysAgoStr);
 
   // Determine resume point
   const lastSavedDate = await getLastSavedFlightDateForIATA(iata_code);
   if (lastSavedDate) {
-    console.log(`⏩ Resuming ${iata_code} from ${lastSavedDate.toISOString()}`);
+    console.log(
+      `                    ⏩ Resuming ${iata_code} from ${lastSavedDate.toISOString()}`
+    );
   }
 
   for (let { start, end } of chunks) {
@@ -87,7 +124,7 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
 
     if (chunkStartDate > fourDaysAgo) {
       console.log(
-        ` Skipping chunk starting ${start} as it exceeds 4 days ago limit.`
+        `                    Skipping chunk starting ${start} as it exceeds 4 days ago limit.`
       );
       continue;
     }
@@ -105,7 +142,7 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
     // Construct API URL
     const url = `${FLIGHTS_HISTORY_BASE_URL}&code=${iata_code}&type=departure&date_from=${chunkStart}&date_to=${end}`;
     console.log(
-      ` Fetching flights for ${iata_code}  (${chunkStart} → ${end})...`
+      `                    Fetching flights for ${iata_code}  (${chunkStart} → ${end})...`
     );
     // console.log("→ URL:", url);
 
@@ -144,38 +181,36 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
         }
       }
 
-      console.log(
-        `Fraction of Valid Flights: ${flightData.length}/${fetchedFlights}`
-      );
-      if (flightData.length >= DB_BATCH_SIZE){
+      if (flightData.length > 0){
+        // Send flight data to Kafka topic
+        await sendMessage(flightTopic, flightData);
         console.log(
-          `Valid Unsaved flightData: ${flightData.length} > DB_BATCH_SIZE: ${DB_BATCH_SIZE}`
+          `                    → Sent ${flightData.length} / ${fetchedFlights} valid flights to Kafka topic.`
         );
-        await saveFlightData(flightData);
-        flightData = [];
-        fetchedFlights = 0;
-      };
+        flightData = []; // Clear after sending
+      }
 
       await delay(REQUEST_DELAY_MS); // avoid API throttling
     } catch (error) {
       console.error(
-        `  Error fetching flights for ${iata_code}:`,
+        `                    Error fetching flights for ${iata_code}:`,
         error.message
       );
        console.error(
-         "Error fetching:",
+         `                    Error fetching flight data for ${iata_code}:`,
          error.response?.status,
          error.response?.data
        );
-       console.error(`------- Skipping ${iata_code}`);
+       console.error(`                    Skipping ${iata_code}`);
 
-       if (flightData.length > 0) {
-         console.log(` ##.......... Saving remaining records.`);
-         console.log(`Remaining flightData: ${flightData.length}`);
-         await saveFlightData(flightData);
-         flightData = [];
-         fetchedFlights = 0;
-       }
+      if (flightData.length > 0) {
+        // Send flight data to Kafka topic
+        await sendMessage(flightTopic, flightData);
+        console.log(
+          `                    → Sent ${flightData.length} / ${fetchedFlights} valid flights to Kafka topic.`
+        );
+        flightData = []; // Clear after sending
+      }
       break;
     }
 
@@ -183,34 +218,12 @@ exports.fetchandSaveDepartureFlightsForEachAirport = async (
   }
 
   if (flightData.length > 0) {
-     console.log("##... Saving final records ............");
-     console.log(`Final flightData: ${flightData.length}`);
-    await saveFlightData(flightData);
-    flightData = [];
-    fetchedFlights = 0;
+    // Send flight data to Kafka topic
+    await sendMessage(flightTopic, flightData);
+    console.log(
+      `                    → Sent ${flightData.length} / ${fetchedFlights} valid flights to Kafka topic.`
+    );
+    flightData = []; // Clear after sending
   }
 
-};
-
-
-exports.fetchFlightDatafromDB = async () => {
-  try {
-    const flights = await Flight.findAll({
-      attributes: [
-        "airlineIcaoCode",
-        [Sequelize.literal('ANY_VALUE("airlineIataCode")'), "airlineIataCode"],
-      ],
-      where: {
-        airlineIcaoCode: { [Op.ne]: null },
-        airlineIataCode: { [Op.ne]: null },
-      },
-      group: ["airlineIcaoCode"],
-      raw: true,
-    });
-
-    return flights;
-  } catch (error) {
-    console.error("Error fetching flight data:", error);
-    return [];
-  }
 };
