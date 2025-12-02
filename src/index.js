@@ -33,7 +33,6 @@ app.listen(PORT, async () => {
     console.log(`Server is listening on port ${PORT}`);
 
     (async () => {
-      console.time(" duration");
 
       //Start counting time for the completion of this process
       console.log("Initializing Kafka setup");
@@ -53,16 +52,22 @@ app.listen(PORT, async () => {
 
       // Data fetching
       console.log("Performing data fetch");
+
       // Fetch weather data for all airports for the past 1 year
-      (async () => await fetchAllAirportsWeatherData({ years: 1 }))();
+      (async () => {
+        console.time("Weather data fetch duration");
+        await fetchAllAirportsWeatherData({ years: 1 })
+        console.timeEnd("Weather data fetch duration");
+      })();
 
       // Fetch flight data for all airports for the past 360 days
-      (async () => await fetchAllAirportsFlightsData({ days: 360 }))();
-
+      (async () => {
+        console.time("Flight data fetch duration");
+        await fetchAllAirportsFlightsData({ days: 360 })
+        console.timeEnd("Flight data fetch duration");
+      })();
       console.log("Data fetch operation completed");
 
-      
-      console.timeEnd("Process duration");
     })();
 
   } catch (error) {
