@@ -1,6 +1,6 @@
 const sequelize = require("../../config/sequelize");
 const { DataTypes } = require("sequelize");
-const Airport = require("./Airport");
+const Airport = require("./airport.js");
 
 const Flight = sequelize.define(
   "flight",

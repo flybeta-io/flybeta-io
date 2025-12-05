@@ -1,4 +1,4 @@
-const Airport = require("../models/Airport");
+const Airport = require("../models/airport.js");
 
 /** Generate a single date chunk for the past N days */
 exports.generateDailyChunk = (daysBack) => {

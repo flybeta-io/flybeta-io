@@ -39,7 +39,7 @@ app.listen(PORT, async () => {
 
       // Setup Kafka Topics
       console.log("Setting up Kafka topics");
-      await checkTopic([weatherTopic, flightTopic]);
+      await checkTopic([weatherTopic, flightTopic, predictionTopic]);
 
       // Start Kafka Consumers
       console.log("Starting Kafka Consumers");
@@ -53,19 +53,19 @@ app.listen(PORT, async () => {
       // Data fetching
       console.log("Performing data fetch");
 
-      // Fetch weather data for all airports for the past 1 year
-      (async () => {
-        console.time("Weather data fetch duration");
-        await fetchAllAirportsWeatherData({ years: 1 })
-        console.timeEnd("Weather data fetch duration");
-      })();
+      // // Fetch weather data for all airports for the past 1 year
+      // (async () => {
+      //   console.time("Weather data fetch duration");
+      //   await fetchAllAirportsWeatherData({ years: 1 })
+      //   console.timeEnd("Weather data fetch duration");
+      // })();
 
-      // Fetch flight data for all airports for the past 360 days
-      (async () => {
-        console.time("Flight data fetch duration");
-        await fetchAllAirportsFlightsData({ days: 360 })
-        console.timeEnd("Flight data fetch duration");
-      })();
+      // // Fetch flight data for all airports for the past 360 days
+      // (async () => {
+      //   console.time("Flight data fetch duration");
+      //   await fetchAllAirportsFlightsData({ days: 360 })
+      //   console.timeEnd("Flight data fetch duration");
+      // })();
       console.log("Data fetch operation completed");
 
     })();

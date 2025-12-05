@@ -1,33 +1,38 @@
 services:
 
-  # backend:
-  #   image: flybeta-backend
-  #   build:
-  #     context: .
-  #     dockerfile: dockerfile
-  #   container_name: flybeta-app-backend
-  #   ports:
-  #     - 5000:5000
-  #   environment:
-  #     - "NODE_ENV=development"
-  #   networks:
-  #     - flybeta-network
-  #   depends_on:
-  #     - kafka
-  #     - kafka-ui
+  # Node.js backend
+  backend:
+    image: flybeta-backend
+    build:
+      context: ./backend
+      dockerfile: dockerfile
+    container_name: backend
+    ports:
+      - 5000:5000
+    env_file:
+      - ./backend/.env
+    environment:
+      - "NODE_ENV=development"
+    networks:
+      - flybeta-network
+    depends_on:
+      - kafka
+      - kafka-ui
+
+  # Kafka broker
   kafka:
     image: apache/kafka:4.1.0
     container_name: kafka
     user: root
     ports:
       - "9092:9092"      # internal listener
-      - "29092:29092"    # external listener (for your PC)
+      - "29092:29092"    # external listener (for your Node.js)
       - "9093:9093"      # controller
     environment:
       KAFKA_KRAFT_MODE: "true"
       KAFKA_BROKER_ID: 1
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092, EXTERNAL://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://kafka:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
@@ -35,14 +40,12 @@ services:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LOG_DIRS: "/kafka-logs"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      # KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
-      # KAFKA_MESSAGE_MAX_BYTES: 104857600
-      # KAFKA_REPLICA_FETCH_MAX_BYTES: 104857600
     volumes:
-      - kafka-data:/kafka-logs
+      - flybeta-data:/kafka-logs
     networks:
       - flybeta-network
 
+  # Kafka UI
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
@@ -57,8 +60,38 @@ services:
     networks:
       - flybeta-network
 
+    # ML FastAPI service
+  ml:
+    image: flybeta-ml
+    build:
+      context: ./ml
+      dockerfile: dockerfile
+    container_name: ml
+    ports:
+      - "6000:6000"
+    networks:
+      - flybeta-network
+    depends_on:
+      - kafka
+      - backend
+
+  # Flink service
+  flink:
+    image: apache/flink:1.18-scala_2.12
+    build:
+      context: ./flink
+      dockerfile: dockerfile
+    container_name: flink
+    ports:
+      - "8081:8081"  # Flink dashboard
+    networks:
+      - flybeta-network
+    depends_on:
+      - kafka
+      - ml
+
 volumes:
-  kafka-data:
+  flybeta-data:
 
 networks:
   flybeta-network:

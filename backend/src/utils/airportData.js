@@ -1,6 +1,6 @@
 const fs = require("fs");
 const csv = require("csv-parser");
-const Airport = require("../models/Airport");
+const Airport = require("../models/airport.js");
 const { Op } = require("sequelize");
 const { default: axios } = require("axios");
 require("dotenv").config();

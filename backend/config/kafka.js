@@ -2,7 +2,7 @@ const { Kafka } = require("kafkajs");
 
 const kafka = new Kafka({
   clientId: "flybeta-app",
-  brokers: ["localhost:29092"], // connects to Docker Kafka
+  brokers: ["kafka:29092"], // connects to Docker Kafka
   requestTimeout: 60000,
   retry: {
     retries: 3
