@@ -70,7 +70,9 @@ exports.fetchAllAirportsFlightsData = async ({ days = null, years = null }) => {
   // Sequentially process each airport code
   for (const { icao_code, iata_code } of airports) {
     try {
-      console.log(`              Fetching flight data for IATA Code: ${iata_code}`);
+      console.log(
+        `                        Fetching flight data for IATA Code: ${iata_code}`
+      );
       await fetchSingleAirportFlightData(
         icao_code,
         iata_code,

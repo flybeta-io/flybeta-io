@@ -8,7 +8,7 @@ const { weatherTopic } = require("../../config/kafka");
 const API_KEY = process.env.VISUAL_CROSSING_API_KEY;
 const BASE_URL =
   "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline";
-const REQUEST_DELAY_MS = 2000; // rate-limit delay between API calls
+const REQUEST_DELAY_MS = 1500; // rate-limit delay between API calls
 
 
 
@@ -115,7 +115,7 @@ exports.fetchSingleAirportWeatherData = async (
         }
       }
 
-      console.log(`  ------→ Sending weather data of length ${weatherData.length} to topic.`);
+      console.log(`  → Sending weather data of length ${weatherData.length} to topic.`);
       if (weatherData.length > 0) {
         // Send weather data to Kafka topic
         await sendMessage(weatherTopic, weatherData);

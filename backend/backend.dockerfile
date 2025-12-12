@@ -14,4 +14,6 @@ ENV PORT=5000
 
 EXPOSE 5000
 
-CMD ["npm", "start"]
+# CMD ["npm", "start"]
+
+CMD ["sh", "-c", "echo 'Waiting 10 seconds before starting...'; sleep 10; npm start"]

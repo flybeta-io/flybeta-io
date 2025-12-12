@@ -16,11 +16,6 @@ async def home():
     return "Welcome to FlyBeta ML API"
 
 
-async def predict_stage_2(input):
-    prediction_2 = stage_2_model.predict(input).item()
-    return prediction_2
-
-
 @router.post("/")
 async def predict(payload: PredictionRequest):
     # Convert Pydantic model → dict
@@ -32,14 +27,17 @@ async def predict(payload: PredictionRequest):
     # Make prediction
     prediction = stage_1_model.predict(X).item()
 
-    if prediction == 0:
-        delay = "No delay!"
-    else:
-        prediction_2 = await predict_stage_2(X)
+    return {"prediction": prediction}
 
-        if prediction_2 == 1:
-            delay = "Greater than 30 mins"
-        else:
-            delay = "Less than 30 mins"
 
-    return {"Delay": delay}
+@router.post("/stage2")
+async def predict_stage_2(payload: PredictionRequest):
+
+    features = payload.model_dump()
+
+    X = [list(features.values())]
+
+
+    prediction_2 = stage_2_model.predict(X).item()
+
+    return {"prediction_2": prediction_2}

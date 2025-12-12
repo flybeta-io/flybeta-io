@@ -1,11 +1,12 @@
 services:
-
-  # Node.js backend
+  # ============================
+  #  Node.js Backend (Producer)
+  # ============================
   backend:
     image: flybeta-backend
     build:
       context: ./backend
-      dockerfile: dockerfile
+      dockerfile: backend.dockerfile
     container_name: backend
     ports:
       - 5000:5000
@@ -18,8 +19,13 @@ services:
     depends_on:
       - kafka
       - kafka-ui
+    volumes:
+      - flags-data:/opt/flags
 
-  # Kafka broker
+
+  # ============================
+  #  Kafka Broker
+  # ============================
   kafka:
     image: apache/kafka:4.1.0
     container_name: kafka
@@ -31,21 +37,26 @@ services:
     environment:
       KAFKA_KRAFT_MODE: "true"
       KAFKA_BROKER_ID: 1
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://kafka:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LOG_DIRS: "/kafka-logs"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_MESSAGE_MAX_BYTES: 20000000   # <-- 20 MB max message size
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 20000000  # <-- also increase replica fetch size
     volumes:
-      - flybeta-data:/kafka-logs
+      - kafka-data:/kafka-logs
     networks:
       - flybeta-network
 
-  # Kafka UI
+
+  # ============================
+  #  Kafka UI
+  # ============================
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
@@ -60,12 +71,15 @@ services:
     networks:
       - flybeta-network
 
-    # ML FastAPI service
+
+  # ============================
+  #  ML API (FastAPI)
+  # ============================
   ml:
     image: flybeta-ml
     build:
       context: ./ml
-      dockerfile: dockerfile
+      dockerfile: ml.dockerfile
     container_name: ml
     ports:
       - "6000:6000"
@@ -75,13 +89,17 @@ services:
       - kafka
       - backend
 
-  # Flink service
+
+  # ============================
+  #  Flink Processor
+  # ============================
   flink:
-    image: apache/flink:1.18-scala_2.12
     build:
       context: ./flink
-      dockerfile: dockerfile
+      dockerfile: flink.dockerfile
     container_name: flink
+    environment:
+      FLINK_PROPERTIES: "jobmanager.rpc.address: jobmanager"
     ports:
       - "8081:8081"  # Flink dashboard
     networks:
@@ -89,9 +107,13 @@ services:
     depends_on:
       - kafka
       - ml
+    volumes:
+      - flags-data:/opt/flags
 
 volumes:
-  flybeta-data:
+  kafka-data:
+  flags-data:
+
 
 networks:
   flybeta-network:
