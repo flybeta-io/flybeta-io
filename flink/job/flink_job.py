@@ -1,6 +1,7 @@
 import json
 import asyncio
 import pandas as pd
+import httpx
 
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment, EnvironmentSettings
@@ -21,6 +22,23 @@ from transformers.custom_transformers import (
 from predictors.stage_predictor import process_record
 
 from settings import WEATHER_TOPIC, FLIGHT_TOPIC, PREDICTION_TOPIC, feature_order
+
+semaphore = asyncio.Semaphore(10)
+
+async def safe_process_record(payload, expected_cols_stage1, expected_cols_stage2, retries=2):
+    """Call process_record safely with concurrency limit and retry on failure."""
+    for attempt in range(retries + 1):
+        try:
+            async with semaphore:
+                return await process_record(
+                    payload,
+                    expected_cols_stage1=expected_cols_stage1,
+                    expected_cols_stage2=expected_cols_stage2,
+                )
+        except httpx.RequestError as e:  # timeout or network errors
+            if attempt == retries:
+                raise
+            await asyncio.sleep(1.5)  # brief delay before retry
 
 
 # ==================================================
@@ -93,7 +111,7 @@ async def run_pipeline():
         rows.append({"unique_key": unique_key})
 
         coros.append(
-            process_record(
+            safe_process_record(
                 payload,
                 expected_cols_stage1=feature_order,
                 expected_cols_stage2=feature_order,

@@ -8,3 +8,4 @@ apache-flink==2.2.0
 kafka-python
 aiohttp
 scikit-learn
+httpx
