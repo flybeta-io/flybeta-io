@@ -10,7 +10,8 @@ const { flightTopic } = require("../../config/kafka");
 
 const API_KEY = process.env.AVIATION_EDGE_API_KEY;
 const FLIGHTS_HISTORY_BASE_URL = `https://aviation-edge.com/v2/public/flightsHistory?key=${API_KEY}`;
-const REQUEST_DELAY_MS = 2000; // rate-limit delay between API calls
+const REQUEST_DELAY_MS = 1500; // rate-limit delay between API calls
+const BackdateHoursInMS = 24 * 60 * 60 * 1000; // backdate to avoid overlaps
 
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -111,6 +112,7 @@ exports.fetchSingleAirportFlightData = async (
   // Determine resume point
   const lastSavedDate = await getLastSavedFlightDateForIATA(iata_code);
   if (lastSavedDate) {
+    lastSavedDate.setTime(lastSavedDate.getTime() - BackdateHoursInMS);
     console.log(
       `                    ⏩ Resuming ${iata_code} from ${lastSavedDate.toISOString()}`
     );

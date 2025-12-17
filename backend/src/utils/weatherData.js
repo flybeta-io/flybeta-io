@@ -9,6 +9,7 @@ const API_KEY = process.env.VISUAL_CROSSING_API_KEY;
 const BASE_URL =
   "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline";
 const REQUEST_DELAY_MS = 1500; // rate-limit delay between API calls
+const BackdateHoursInMS = 24 * 60 * 60 * 1000; // backdate to avoid overlaps
 
 
 
@@ -67,9 +68,10 @@ exports.fetchSingleAirportWeatherData = async (
 
   let weatherData = [];
 
-  // Determine resume point
+  // Determine resume point. Backdate by 24 hours
   const lastSavedDate = await getLastSavedWeatherDateForICAO(icao_code);
   if (lastSavedDate) {
+    lastSavedDate.setTime(lastSavedDate.getTime() - BackdateHoursInMS);
     console.log(`⏩ Resuming ${icao_code} from ${lastSavedDate.toISOString()}`);
   }
 

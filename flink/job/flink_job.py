@@ -25,6 +25,8 @@ from settings import WEATHER_TOPIC, FLIGHT_TOPIC, PREDICTION_TOPIC, feature_orde
 
 semaphore = asyncio.Semaphore(10)
 
+batch_size = 100
+
 async def safe_process_record(payload, expected_cols_stage1, expected_cols_stage2, retries=2):
     """Call process_record safely with concurrency limit and retry on failure."""
     for attempt in range(retries + 1):
@@ -57,6 +59,9 @@ async def run_pipeline():
     t_env = StreamTableEnvironment.create(env, environment_settings=settings)
 
     logger.info("Starting Flink Job...")
+
+    # Time start
+    start_time = pd.Timestamp.now()
 
     # -----------------------------
     #  READ BOTH TOPICS
@@ -118,37 +123,49 @@ async def run_pipeline():
             )
         )
 
-
-    # Run all ML predictions concurrently
-    results = await asyncio.gather(*coros)
-
-    logger.info(f"Writing prediction results to Kafka {PREDICTION_TOPIC}...")
-
     success_count = 0
     error_count = 0
+    i = 0
+    total_coros = len(coros)
 
-    for meta, result in zip(rows, results):
-        message = {
-            "unique_key": meta["unique_key"],
-            "prediction_result": result,
-            "timestamp": pd.Timestamp.now().isoformat()
-        }
-        # send_message(producer, PREDICTION_TOPIC, message)
-        try:
-            producer.send(PREDICTION_TOPIC, value=message)
+    while i <= total_coros:
+        batch = coros[i : i + batch_size]
+        results = await asyncio.gather(*batch)
 
-            # Track success/errors
-            if "error" not in result:
-                success_count += 1
-            else:
+        for j, result in enumerate(results):
+            meta = rows[i + j]
+            message = {
+                "unique_key": meta["unique_key"],
+                "stage": result.get("stage"),
+                "prediction": result.get("prediction"),
+                "timestamp": pd.Timestamp.now().isoformat()
+            }
+            try:
+                logger.info(f"Writing prediction results to Kafka {PREDICTION_TOPIC}...")
+                producer.send(PREDICTION_TOPIC, value=message)
+
+                # Track success/errors
+                if "error" not in result:
+                    success_count += 1
+                else:
+                    error_count += 1
+                    print(f"[ERROR] {meta['unique_key']}: {result.get('error')}")
+
+            except Exception as e:
                 error_count += 1
-                print(f"[ERROR] {meta['unique_key']}: {result.get('error')}")
+                print(f"[KAFKA ERROR] Failed to send {meta['unique_key']}: {e}")
 
-        except Exception as e:
-            error_count += 1
-            print(f"[KAFKA ERROR] Failed to send {meta['unique_key']}: {e}")
+        logger.info(f"Saved {success_count} prediction results to Kafka {PREDICTION_TOPIC}...")
+
+        i += batch_size
+        logger.info(f"Processed {min(i, total_coros)}/{total_coros} records...")
 
     logger.info("Finished sending predictions.")
+
+    # Time end
+    end_time = pd.Timestamp.now()
+    duration = end_time - start_time
+    print(f"\nTotal Duration: {duration}")
 
     producer.flush()
     producer.close()

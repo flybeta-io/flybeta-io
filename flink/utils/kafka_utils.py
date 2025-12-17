@@ -2,7 +2,6 @@ import json
 import os
 from kafka import KafkaProducer, KafkaConsumer
 from pyflink.table import StreamTableEnvironment
-# from pyflink.table.descriptors import Kafka, Json, Schema
 
 
 BOOTSTRAP = "kafka:9092"

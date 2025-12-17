@@ -7,12 +7,15 @@ const { checkTopic } = require("./events/admin");
 const { connectProducer } = require("./events/producer");
 const { runFlightConsumer } = require("./events/flightConsumer");
 const { runWeatherConsumer } = require("./events/weatherConsumer");
-const {
-  fetchAllAirportsWeatherData,
-} = require("./controllers/weatherController");
-const {
-  fetchAllAirportsFlightsData,
-} = require("./controllers/flightController");
+const { runPredictionConsumer } = require("./events/predictionConsumer");
+// const { runKafkaConsumer } = require("./events/runKafkaConsumer");
+// const {
+//   fetchAllAirportsWeatherData,
+// } = require("./controllers/weatherController");
+// const {
+//   fetchAllAirportsFlightsData,
+// } = require("./controllers/flightController");
+const { fetchAllData } = require("./controllers/combinedFetch");
 const { weatherTopic, flightTopic, predictionTopic } = require("../config/kafka");
 const { createDoneFlag } = require("./events/flag_creator");
 
@@ -48,6 +51,7 @@ app.listen(PORT, async () => {
       console.log("Starting Kafka Consumers");
       await runWeatherConsumer(weatherTopic);
       await runFlightConsumer(flightTopic);
+      await runPredictionConsumer(predictionTopic);
 
       // Connect Kafka Producer
       console.log("Connecting Kafka Producer");
@@ -57,20 +61,28 @@ app.listen(PORT, async () => {
       console.log("Performing data fetch");
 
       // Fetch weather data for all airports for the past 1 year
+      // (async () => {
+      //   console.time("Weather data fetch duration");
+      //   await fetchAllAirportsWeatherData({ years: 1 })
+      //   console.timeEnd("Weather data fetch duration");
+      //   createDoneFlag(batchTimeStart);
+      // })();
+
+      // // Fetch flight data for all airports for the past 360 days
+      // (async () => {
+      //   console.time("                    Flight data fetch duration");
+      //   await fetchAllAirportsFlightsData({ days: 360 })
+      //   console.timeEnd("                    Flight data fetch duration");
+      // })();
+
       (async () => {
-        console.time("Weather data fetch duration");
-        await fetchAllAirportsWeatherData({ years: 1 })
-        console.timeEnd("Weather data fetch duration");
+        console.time("Combined data fetch duration");
+        await fetchAllData({ days: 360, year: 1 });
+        console.timeEnd("Combined data fetch duration");
         createDoneFlag(batchTimeStart);
+        console.log("Data fetch operation completed");
       })();
 
-      // Fetch flight data for all airports for the past 360 days
-      (async () => {
-        console.time("                    Flight data fetch duration");
-        await fetchAllAirportsFlightsData({ days: 360 })
-        console.timeEnd("                    Flight data fetch duration");
-      })();
-      console.log("Data fetch operation completed");
 
     })();
 

@@ -34,6 +34,25 @@ def clean_airlines(df: pd.DataFrame, logger) -> pd.DataFrame:
     logger.info(f"Removed private/charter airlines. Remaining: {df.shape[0]:,} records.")
     return df
 
+# List of Nigerian airport IATA codes
+NG_AIRPORTS = {
+    "ABV",    "PHC",    "KAN",    "BNI",    "IBA",    "QRW",    "KAD",
+    "MIU",    "ABB",    "ENU",    "ILR",    "GMO",    "MDI",    "QUO",
+    "MXJ",    "DKA",    "SKO",    "YOL",    "AKR",    "PHG",    "JOS",
+    "QOW",    "BCU",    "ZAR",    "LOS",    "CBQ",
+}
+
+
+def select_ng_airports(df: pd.DataFrame, logger) -> pd.DataFrame:
+    """Filter to only Nigerian airports."""
+    logger.info("Filtering to Nigerian airports...")
+
+    mask = df["originIata"].isin(NG_AIRPORTS) & df["destIata"].isin(NG_AIRPORTS)
+
+    df = cast(pd.DataFrame, df.loc[mask, :].reset_index(drop=True))
+    logger.info(f"Filtered to Nigerian airports.")
+    return df
+
 def remove_same_origin_destination(df: pd.DataFrame, logger) -> pd.DataFrame:
     """Remove records where origin and destination airports are the same."""
     logger.info("Removing records with same origin and destination airports...")
@@ -106,6 +125,8 @@ def transform_flights_data_serving(df: pd.DataFrame, logger) -> pd.DataFrame:
 
     # 2. Clean Airlines
     df = clean_airlines(df, logger)
+
+    df = select_ng_airports(df, logger)
 
     # 3. Remove Same Origin/Destination
     df = remove_same_origin_destination(df, logger)

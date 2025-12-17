@@ -132,7 +132,7 @@ exports.fetchAirportsDatafromDB = async () => {
     const airports = await Airport.findAll({
       attributes: ["icao_code", "iata_code", "latitude_deg", "longitude_deg"],
       raw: true,
-      // limit: 30,
+      // limit: 10,
       // order: [["createdAt", "DESC"]],
       // random: true,
     });

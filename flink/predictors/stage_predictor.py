@@ -12,7 +12,7 @@ from typing import Dict, Any, List
 preprocessor1 = joblib.load("/opt/flink/preprocessors/stage1_preprocessor.joblib")
 preprocessor2 = joblib.load("/opt/flink/preprocessors/stage2_preprocessor.joblib")
 
-ML_API_STAGE1 = "http://ml:6000/predict"
+ML_API_STAGE1 = "http://ml:6000/predict/stage1"
 ML_API_STAGE2 = "http://ml:6000/predict/stage2"
 
 
@@ -145,7 +145,7 @@ async def process_record(
             return {
                 "stage": 1,
                 "error": "Stage 1 API failed",
-                "stage1_raw": result1
+                "result": result1
             }
 
         # Check prediction result
@@ -155,9 +155,7 @@ async def process_record(
             # Flight predicted ON-TIME, no need for stage 2
             return {
                 "stage": 1,
-                "prediction": "ON_TIME",
-                "confidence": "high",
-                "stage1_raw": result1
+                "prediction": result1.get("prediction"),
             }
 
         # -------------------------
@@ -179,24 +177,12 @@ async def process_record(
             return {
                 "stage": 2,
                 "error": "Stage 2 API failed",
-                "stage1_raw": result1,
-                "stage2_raw": result2
+                "result": result2
             }
-
-        # Get final prediction from stage 2
-        prediction_stage2 = result2.get("prediction_2")
-
-        # Determine final prediction label
-        if prediction_stage2 == 1:
-            prediction_label = "DELAY"
-        else:
-            prediction_label = "ON_TIME"
 
         return {
             "stage": 2,
-            "prediction": prediction_label,
-            "stage1_raw": result1,
-            "stage2_raw": result2
+            "prediction": result2.get("prediction_2"),
         }
 
     except Exception as e:

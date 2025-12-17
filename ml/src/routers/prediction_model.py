@@ -16,7 +16,7 @@ async def home():
     return "Welcome to FlyBeta ML API"
 
 
-@router.post("/")
+@router.post("/stage1")
 async def predict(payload: PredictionRequest):
     # Convert Pydantic model → dict
     features = payload.model_dump()
