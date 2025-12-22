@@ -1,4 +1,24 @@
 services:
+
+  # ============================
+  #  Google Cloud SQL Proxy
+  # ============================
+  cloudsql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.20.0
+    container_name: cloudsql_proxy
+    command: >
+      --address 0.0.0.0
+      --port 5432
+      --credentials-file /config/key.json
+      ${CLOUD_SQL_INSTANCE_NAME}
+    volumes:
+      - ./secrets/service-account-key.json:/config/key.json:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - flybeta-network
+    restart: always
+
   # ============================
   #  Node.js Backend (Producer)
   # ============================
@@ -11,12 +31,13 @@ services:
     ports:
       - 5000:5000
     env_file:
-      - ./backend/.env
+      - .env
     environment:
       - "NODE_ENV=development"
     networks:
       - flybeta-network
     depends_on:
+      - cloudsql-proxy
       - kafka
       - kafka-ui
     volumes:
@@ -32,7 +53,6 @@ services:
     user: root
     ports:
       - "9092:9092"      # internal listener
-      - "29092:29092"    # external listener (for your Node.js)
       - "9093:9093"      # controller
     environment:
       KAFKA_KRAFT_MODE: "true"
@@ -81,6 +101,8 @@ services:
       context: ./ml
       dockerfile: ml.dockerfile
     container_name: ml
+    env_file:
+      - .env
     ports:
       - "6000:6000"
     networks:
@@ -110,10 +132,61 @@ services:
     volumes:
       - flags-data:/opt/flags
 
+  # ============================
+  #  WhatsApp Bot
+  # ============================
+  whatsapp-bot:
+    image: flybeta-whatsapp-bot
+    build:
+      context: ./bot
+      dockerfile: whatsapp_bot.dockerfile
+    container_name: whatsapp-bot
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - "NODE_ENV=development"
+    networks:
+      - flybeta-network
+    depends_on:
+      - backend
+      - cloudsql-proxy
+      - redis
+
+  # ============================
+  #  Ngrok Tunnel
+  # ============================
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok
+    env_file:
+      - .env
+    restart: unless-stopped
+    command: http whatsapp-bot:${WHATSAPP_BOT_PORT}
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTH_TOKEN}
+    ports:
+      - "4040:4040"  # Ngrok web interface
+    networks:
+      - flybeta-network
+    depends_on:
+      - whatsapp-bot
+
+    # ===========================
+    # Redis
+    # ===========================
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - flybeta-network
+
 volumes:
   kafka-data:
   flags-data:
-
 
 networks:
   flybeta-network:

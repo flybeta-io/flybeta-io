@@ -10,7 +10,7 @@ const { flightTopic } = require("../../config/kafka");
 
 const API_KEY = process.env.AVIATION_EDGE_API_KEY;
 const FLIGHTS_HISTORY_BASE_URL = `https://aviation-edge.com/v2/public/flightsHistory?key=${API_KEY}`;
-const REQUEST_DELAY_MS = 1500; // rate-limit delay between API calls
+const REQUEST_DELAY_MS = 1000; // rate-limit delay between API calls
 const BackdateHoursInMS = 24 * 60 * 60 * 1000; // backdate to avoid overlaps
 
 
@@ -78,7 +78,23 @@ exports.saveFlightData = async (flightData) => {
       console.warn("                    No flight data to save:", flightData);
       return;
     }
-    await Flight.bulkCreate(flightData, { ignoreDuplicates: true });
+    await Flight.bulkCreate(flightData, {
+      updateOnDuplicate: [
+        "flightID",
+        "airlineName",
+        "airlineIcaoCode",
+        "airlineIataCode",
+        "scheduledDepartureTime",
+        "actualDepartureTime",
+        "scheduledArrivalTime",
+        "actualArrivalTime",
+        "originAirportIata",
+        "destinationAirportIata",
+        "delay",
+        "status",
+        "updatedAt",
+      ],
+    });
     console.log(
       `                    ✅ Saved ${flightData.length} flight records.`
     );

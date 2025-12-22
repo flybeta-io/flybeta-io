@@ -1,0 +1,13 @@
+.env
+.DS_Store
+.vscode/
+node_modules/
+uploads/
+
+
+.venv/
+__pycache__
+*.pyc
+
+
+secrets/

@@ -6,7 +6,7 @@ from src.router import router
 
 
 load_dotenv()
-PORT = int(os.getenv("PORT", 7500))
+PORT = int(os.getenv("ML_PORT", 7500))
 
 
 app = FastAPI()

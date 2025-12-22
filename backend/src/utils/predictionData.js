@@ -6,7 +6,9 @@ exports.savePredictionData = async (predictionData) => {
             console.warn("No prediction data to save.");
             return;
         }
-        await Prediction.bulkCreate(predictionData, { ignoreDuplicates: true });
+        await Prediction.bulkCreate(predictionData, {
+          updateOnDuplicate: ["timestamp", "stage", "prediction", "updatedAt"],
+        });
         console.log(`✅ Saved ${predictionData.length} prediction records.`);
     } catch (error) {
         console.error(" Error saving prediction data:", error.message);

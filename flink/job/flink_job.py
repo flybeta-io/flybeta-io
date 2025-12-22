@@ -23,7 +23,7 @@ from predictors.stage_predictor import process_record
 
 from settings import WEATHER_TOPIC, FLIGHT_TOPIC, PREDICTION_TOPIC, feature_order
 
-semaphore = asyncio.Semaphore(10)
+semaphore = asyncio.Semaphore(20)  # limit concurrency to 20
 
 batch_size = 100
 

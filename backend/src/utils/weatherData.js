@@ -8,16 +8,13 @@ const { weatherTopic } = require("../../config/kafka");
 const API_KEY = process.env.VISUAL_CROSSING_API_KEY;
 const BASE_URL =
   "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline";
-const REQUEST_DELAY_MS = 1500; // rate-limit delay between API calls
-const BackdateHoursInMS = 24 * 60 * 60 * 1000; // backdate to avoid overlaps
-
-
+const REQUEST_DELAY_MS = 1000; // rate-limit delay between API calls
+const BackdateHoursInMS = 24 * 60 * 60 * 1000; // safety buffer
 
 /* ------------------------- Helper Utility Functions ------------------------ */
 
 /** Sleep for rate limiting */
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 
 /** Get the most recent saved datetime for a specific ICAO code */
 const getLastSavedWeatherDateForICAO = async (icao_code) => {
@@ -38,7 +35,6 @@ const getLastSavedWeatherDateForICAO = async (icao_code) => {
   }
 };
 
-
 /* --------------------- Saving Script -------------------------------------------*/
 
 exports.saveWeatherData = async (weatherData) => {
@@ -47,7 +43,20 @@ exports.saveWeatherData = async (weatherData) => {
       console.warn("No weather data to save.");
       return;
     }
-    await Weather.bulkCreate(weatherData, { ignoreDuplicates: true });
+    await Weather.bulkCreate(weatherData, {
+      updateOnDuplicate: [
+        "visibility",
+        "precipitation",
+        "precipitation_probability",
+        "wind_speed",
+        "wind_direction",
+        "temperature",
+        "humidity",
+        "pressure",
+        "cloud_cover",
+        "updated_at",
+      ],
+    });
     console.log(`✅ Saved ${weatherData.length} weather records.`);
   } catch (error) {
     console.error(" Error saving weather data:", error.message);
