@@ -60,3 +60,10 @@ exports.sendButtonMessage = async (to, bodyText, buttons) => {
         console.error('Button Error:', err.response ? err.response.data : err.message);
     }
 };
+
+
+
+// Generate sting
+exports.schedulesFunction = async (flight) => {
+  return `\nFlightID: ${flight.flightID}\nAirline Name: ${flight.airlineName}\nOrigin Airport: ${flight.originAirport} (${flight.originAirportIata}) \nDestination Airport: ${flight.destAirport} (${flight.destAirportIata})\nDeparture Time: ${flight.departureTime}`;
+}

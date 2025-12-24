@@ -29,4 +29,9 @@ router.post(
 
 router.post("/fetch", airportController.fetchAirportsbyISOandSavetoDB);
 
+router.post(
+  "/upload/city",
+  upload.single("file"),
+  airportController.uploadAirportCities
+);
 module.exports = router;

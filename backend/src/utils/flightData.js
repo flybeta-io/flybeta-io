@@ -3,17 +3,18 @@ const axios = require("axios");
 require("dotenv").config();
 const { Op, Sequelize } = require("sequelize");
 const { sendMessage } = require('../events/producer');
-const { flightTopic } = require("../../config/kafka");
+const { flightTopic, historicalFlightTopic } = require("../../config/kafka");
 
 
 /* ------------------------- Configuration Constants ------------------------- */
 
 const API_KEY = process.env.AVIATION_EDGE_API_KEY;
 const FLIGHTS_HISTORY_BASE_URL = `https://aviation-edge.com/v2/public/flightsHistory?key=${API_KEY}`;
+const TODAY_FLIGHTS_BASE_URL = `https://aviation-edge.com/v2/public/timetable?key=${API_KEY}`;
+const BackdateHoursInMS = 24 * 60 * 60 * 1000; // backdate for overlaps
+
+
 const REQUEST_DELAY_MS = 1000; // rate-limit delay between API calls
-const BackdateHoursInMS = 24 * 60 * 60 * 1000; // backdate to avoid overlaps
-
-
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 
@@ -109,7 +110,7 @@ exports.saveFlightData = async (flightData) => {
 /* --------------------------- Core Fetching Logic --------------------------- */
 
 // // Fetch and Save flight data for a single airport (by IATA)
-exports.fetchSingleAirportFlightData = async (
+exports.fetchHistoricalFlightDataforSingleAirport = async (
   icao_code,
   iata_code,
   iataCodesInDB,
@@ -135,7 +136,6 @@ exports.fetchSingleAirportFlightData = async (
   }
 
   for (let { start, end } of chunks) {
-
     // Convert chunkStart/end to Date for comparison
     const chunkStartDate = new Date(start);
     const endDate = new Date(end);
@@ -160,9 +160,8 @@ exports.fetchSingleAirportFlightData = async (
     // Construct API URL
     const url = `${FLIGHTS_HISTORY_BASE_URL}&code=${iata_code}&type=departure&date_from=${chunkStart}&date_to=${end}`;
     console.log(
-      `                    Fetching flights for ${iata_code}  (${chunkStart} → ${end})...`
+      `                    Fetching historical flights for ${iata_code}  (${chunkStart} → ${end})...`
     );
-    // console.log("→ URL:", url);
 
     try {
       const response = await axios.get(url);
@@ -179,8 +178,9 @@ exports.fetchSingleAirportFlightData = async (
             airlineName: flight.airline.name.toUpperCase(),
             airlineIcaoCode: flight.airline.icaoCode.toUpperCase(),
             airlineIataCode: flight.airline.iataCode.toUpperCase(),
-            scheduledDepartureTime:
-              (await refineDate(flight.departure.scheduledTime)),
+            scheduledDepartureTime: await refineDate(
+              flight.departure.scheduledTime
+            ),
             actualDepartureTime:
               (await refineDate(flight.departure.actualTime)) || null,
             scheduledArrivalTime:
@@ -188,8 +188,7 @@ exports.fetchSingleAirportFlightData = async (
             actualArrivalTime:
               (await refineDate(flight.arrival.actualTime)) || null,
             originAirportIata: flight.departure.iataCode.toUpperCase(),
-            destinationAirportIata:
-              flight.arrival.iataCode.toUpperCase(),
+            destinationAirportIata: flight.arrival.iataCode.toUpperCase(),
             delay: flight.departure.delay || null,
             status: flight.status || null,
           };
@@ -199,11 +198,11 @@ exports.fetchSingleAirportFlightData = async (
         }
       }
 
-      if (flightData.length > 0){
+      if (flightData.length > 0) {
         // Send flight data to Kafka topic
-        await sendMessage(flightTopic, flightData);
+        await sendMessage(historicalFlightTopic, flightData);
         console.log(
-          `                    → Sent ${flightData.length} / ${fetchedFlights} valid flights to Kafka topic.`
+          `                    → Sent ${flightData.length} / ${fetchedFlights} valid historical flights to ${historicalFlightTopic} topic.`
         );
         flightData = []; // Clear after sending
       }
@@ -214,18 +213,18 @@ exports.fetchSingleAirportFlightData = async (
         `                    Error fetching flights for ${iata_code}:`,
         error.message
       );
-       console.error(
-         `                    Error fetching flight data for ${iata_code}:`,
-         error.response?.status,
-         error.response?.data
-       );
-       console.error(`                    Skipping ${iata_code}`);
+      console.error(
+        `                    Error fetching flight data for ${iata_code}:`,
+        error.response?.status,
+        error.response?.data
+      );
+      console.error(`                    Skipping ${iata_code}`);
 
       if (flightData.length > 0) {
         // Send flight data to Kafka topic
-        await sendMessage(flightTopic, flightData);
+        await sendMessage(historicalFlightTopic, flightData);
         console.log(
-          `                    → Sent ${flightData.length} / ${fetchedFlights} valid flights to Kafka topic.`
+          `                    → Sent ${flightData.length} / ${fetchedFlights} valid historical flights to ${historicalFlightTopic} topic.`
         );
         flightData = []; // Clear after sending
       }
@@ -237,11 +236,108 @@ exports.fetchSingleAirportFlightData = async (
 
   if (flightData.length > 0) {
     // Send flight data to Kafka topic
-    await sendMessage(flightTopic, flightData);
+    await sendMessage(historicalFlightTopic, flightData);
     console.log(
-      `                    → Sent ${flightData.length} / ${fetchedFlights} valid flights to Kafka topic.`
+      `                    → Sent ${flightData.length} / ${fetchedFlights} valid historical flights to ${historicalFlightTopic} topic.`
     );
     flightData = []; // Clear after sending
   }
-
 };
+
+
+// Daily Flights
+exports.fetchDailyFlightSchedule = async (
+  icao_code,
+  iata_code,
+  iataCodesInDB
+) => {
+  let flightData = [];
+  let fetchedFlights = 0;
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+
+  // Construct API URL
+  const url = `${TODAY_FLIGHTS_BASE_URL}&iataCode=${iata_code}&type=departure`;
+  console.log(
+    `                    Fetching today's (${today}) flights for ${iata_code}...`
+  );
+
+
+  try {
+    const response = await axios.get(url)
+    const flights = response.data;
+
+    fetchedFlights += flights.length;
+
+    for (const flight of flights) {
+      //Skip if destination ICAO code is missing in Airport DB
+      if (iataCodesInDB.has(flight.arrival.iataCode.toUpperCase())) {
+        const flightRecord = {
+          flightID: flight.flight.iataNumber.toUpperCase(),
+          airlineName: flight.airline.name.toUpperCase(),
+          airlineIcaoCode: flight.airline.icaoCode.toUpperCase(),
+          airlineIataCode: flight.airline.iataCode.toUpperCase(),
+          scheduledDepartureTime: await refineDate(
+            flight.departure.scheduledTime
+          ),
+          actualDepartureTime:
+            (await refineDate(flight.departure.actualTime)) || null,
+          scheduledArrivalTime:
+            (await refineDate(flight.arrival.scheduledTime)) || null,
+          actualArrivalTime:
+            (await refineDate(flight.arrival.actualTime)) || null,
+          originAirportIata: flight.departure.iataCode.toUpperCase(),
+          destinationAirportIata: flight.arrival.iataCode.toUpperCase(),
+          delay: flight.departure.delay || null,
+          status: flight.status || null,
+        };
+        flightData.push(flightRecord);
+      } else {
+        continue;
+      }
+    }
+
+    if (flightData.length > 0) {
+      // Send flight data to Kafka topic
+      await sendMessage(flightTopic, flightData);
+      console.log(
+        `                    → Sent ${flightData.length} / ${fetchedFlights} valid daily flights to ${flightTopic}.`
+      );
+      flightData = []; // Clear after sending
+    }
+
+    await delay(REQUEST_DELAY_MS); // avoid API throttling
+
+  } catch (error) {
+    console.error(
+      `                    Error fetching flights for ${iata_code}:`,
+      error.message
+    );
+    console.error(
+      `                    Error fetching flight data for ${iata_code}:`,
+      error.response?.status,
+      error.response?.data
+    );
+    console.error(`                    Skipping ${iata_code}`);
+
+    if (flightData.length > 0) {
+      // Send flight data to Kafka topic
+      await sendMessage(flightTopic, flightData);
+      console.log(
+        `                    → Sent ${flightData.length} / ${fetchedFlights} valid daily flights to ${flightTopic}.`
+      );
+      flightData = []; // Clear after sending
+    }
+  }
+
+  await delay(REQUEST_DELAY_MS);
+
+  if (flightData.length > 0) {
+    // Send flight data to Kafka topic
+    await sendMessage(flightTopic, flightData);
+    console.log(
+      `                    → Sent ${flightData.length} / ${fetchedFlights} valid daily flights to ${flightTopic}.`
+    );
+    flightData = []; // Clear after sending
+  }
+}

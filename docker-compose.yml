@@ -120,6 +120,8 @@ services:
       context: ./flink
       dockerfile: flink.dockerfile
     container_name: flink
+    env_file:
+      - .env
     environment:
       FLINK_PROPERTIES: "jobmanager.rpc.address: jobmanager"
     ports:

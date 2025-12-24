@@ -1,11 +1,16 @@
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+
 KAFKA_BOOTSTRAP = "kafka:9092"
 
-WEATHER_TOPIC = "weather_data_topic"
-FLIGHT_TOPIC = "flight_data_topic"
-PREDICTION_TOPIC = "prediction_topic"
+WEATHER_TOPIC = os.getenv("WEATHER_TOPIC")
+FLIGHT_TOPIC = os.getenv("FLIGHT_TOPIC")
+PREDICTION_TOPIC = os.getenv("PREDICTION_TOPIC")
 
 GROUP_ID = "flink-group"
-
 
 feature_order = [
     "airline_name",

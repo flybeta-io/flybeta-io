@@ -1,0 +1,3 @@
+// Redis
+const SHORT_TERM_IN_SECONDS_REDIS = 1 * 60 * 60;
+const LONG_TERM_IN_SECONDS_REDIS = 24 * 60 * 60;

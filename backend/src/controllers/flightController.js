@@ -1,10 +1,11 @@
-const { fetchSingleAirportFlightData } = require("../utils/flightData");
+const { fetchHistoricalFlightDataforSingleAirport, fetchDailyFlightSchedule } = require("../utils/flightData");
 const { generateDailyChunk, generateDynamicYearChunks } = require("../utils/generic");
 const { fetchAirportsDatafromDB } = require('../utils/airportData');
-const { getAirportsCache } = require('../utils/cache');
+// const { getAirportsCache } = require('../utils/cache');
 const Flight = require("../models/flight");
 const { fetchFlightDatafromDB } = require("../utils/flightData");
-
+const redisClient = require("../../config/redisClient");
+const { LONG_TERM_IN_SECONDS_REDIS } = require("../../config/env");
 
 
 // Save the missing airport IcaoCodes in DB
@@ -36,17 +37,14 @@ exports.saveMissingIcaoCodes = async () => {
 }
 
 
-
-
-
 /* ----------------------------- Main Controller ----------------------------- */
 
 /**
  * Fetch and save departure flights for all airports.
  */
-exports.fetchAllAirportsFlightsData = async ({ days = null, years = null }) => {
-  console.log(`                      Fetching Airports Data for Flights Operation`);
-  const airports = await getAirportsCache(fetchAirportsDatafromDB());
+exports.fetchAllHistoricalFlightsData = async ({ days = null, years = null }) => {
+  console.log(`                      Fetching Airports Data for Historical Flights Operation`);
+  const airports = await fetchAirportsDatafromDB();
 
   if (!airports.length) {
     console.warn("                    No IATA codes found in database.");
@@ -64,6 +62,7 @@ exports.fetchAllAirportsFlightsData = async ({ days = null, years = null }) => {
     throw new Error("                    Specify either { days } or { years }");
   }
 
+
   const iataCodesInDB = new Set(airports.map((a) => a.iata_code));
   console.log(`                  Loaded ${iataCodesInDB.size} IATA codes into memory.`);
 
@@ -71,13 +70,54 @@ exports.fetchAllAirportsFlightsData = async ({ days = null, years = null }) => {
   for (const { icao_code, iata_code } of airports) {
     try {
       console.log(
-        `                        Fetching flight data for IATA Code: ${iata_code}`
+        `                        Fetching historical flight data for IATA Code: ${iata_code}`
       );
-      await fetchSingleAirportFlightData(
+      await fetchHistoricalFlightDataforSingleAirport(
         icao_code,
         iata_code,
         iataCodesInDB,
         chunks
+      );
+    } catch (err) {
+      console.error(
+        `                        ❌ Failed fetching historical flights for ${iata_code}: ${err.message}`
+      );
+      continue;
+    }
+  }
+
+  console.log(
+    "                  ✅ All historical flight data fetched and saved successfully."
+  );
+};
+
+
+exports.fetchAllDailyFlights = async () => {
+  console.log(
+    `                      Fetching Airports Data for Daily Flights Operation`
+  );
+  const airports = await fetchAirportsDatafromDB();
+
+  if (!airports.length) {
+    console.warn("                    No IATA codes found in database.");
+    return;
+  }
+
+  const iataCodesInDB = new Set(airports.map((a) => a.iata_code));
+  console.log(
+    `                  Loaded ${iataCodesInDB.size} IATA codes into memory.`
+  );
+
+  // Sequentially process each airport code
+  for (const { icao_code, iata_code } of airports) {
+    try {
+      console.log(
+        `                        Fetching daily flight data for IATA Code: ${iata_code}`
+      );
+      await fetchDailyFlightSchedule(
+        icao_code,
+        iata_code,
+        iataCodesInDB,
       );
     } catch (err) {
       console.error(
@@ -87,5 +127,8 @@ exports.fetchAllAirportsFlightsData = async ({ days = null, years = null }) => {
     }
   }
 
-  console.log("                  ✅ All flight data fetched and saved successfully.");
-};
+  console.log(
+    "                  ✅ All daily flight data fetched and saved successfully."
+  );
+
+}

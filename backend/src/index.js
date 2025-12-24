@@ -5,12 +5,14 @@ const PORT = process.env.BACKEND_PORT || 5000;
 
 const { checkTopic } = require("./events/admin");
 const { connectProducer } = require("./events/producer");
-const { runFlightConsumer } = require("./events/flightConsumer");
+const { runFlightConsumer, runHistoricalFlightConsumer } = require("./events/flightConsumer");
 const { runWeatherConsumer } = require("./events/weatherConsumer");
 const { runPredictionConsumer } = require("./events/predictionConsumer");
 
-const { fetchAllData } = require("./controllers/combinedFetch");
-const { weatherTopic, flightTopic, predictionTopic } = require("../config/kafka");
+const { fetchAllHistoricalFlightsData, fetchAllDailyFlights } = require("./controllers/flightController");
+const { fetchAllAirportsWeatherData } = require("../src/controllers/weatherController");
+// const { fetchAllData } = require("./controllers/combinedFetch");
+const { weatherTopic, flightTopic, predictionTopic, historicalFlightTopic } = require("../config/kafka");
 const { createDoneFlag } = require("./events/flag_creator");
 
 // Middleware
@@ -39,12 +41,13 @@ app.listen(PORT, async () => {
 
       // Setup Kafka Topics
       console.log("Setting up Kafka topics");
-      await checkTopic([weatherTopic, flightTopic, predictionTopic]);
+      await checkTopic([weatherTopic, flightTopic, predictionTopic, historicalFlightTopic]);
 
       // Start Kafka Consumers
       console.log("Starting Kafka Consumers");
       await runWeatherConsumer(weatherTopic);
       await runFlightConsumer(flightTopic);
+      await runHistoricalFlightConsumer(historicalFlightTopic);
       await runPredictionConsumer(predictionTopic);
 
       // Connect Kafka Producer
@@ -55,18 +58,21 @@ app.listen(PORT, async () => {
       console.log("Performing data fetch");
 
 
-      (async () => {
-        console.time("Combined data fetch duration");
-        await fetchAllData({ days: 360, year: 1 });
-        console.timeEnd("Combined data fetch duration");
-        createDoneFlag(batchTimeStart);
-        console.log("Data fetch operation completed");
-      })();
+      console.time("Combined data fetch duration");
+      // await fetchAllData();
+      await Promise.all([
+        fetchAllDailyFlights(),
+        fetchAllAirportsWeatherData({ years: 1 }),
+      ]);
+      console.log("✅ Both data fetches completed.");
+      console.timeEnd("Combined data fetch duration");
+      createDoneFlag(batchTimeStart);
 
-
+      await fetchAllHistoricalFlightsData({ days: 360 });
+      
     })();
 
   } catch (error) {
-    console.error(`Unable to connect to the database ${error}`);
+    console.error(`An error occured: ${error}`);
   }
 });

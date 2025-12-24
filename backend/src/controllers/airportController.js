@@ -1,9 +1,10 @@
 const {
   uploadAirportsToDB,
   fetchandSaveAirportsToDB,
+  fetchAirportsDatafromDB,
+  saveAirportsCities
 } = require("../utils/airportData");
 const { getAirportsCache } = require("../utils/cache");
-const { fetchAirportsDatafromDB } = require("../utils/airportData");
 
 exports.uploadAirportsByFile = async (req, res) => {
   const { savedAirports, errors } = await uploadAirportsToDB(req, res);
@@ -57,3 +58,20 @@ exports.fetchAirportsbyISOandSavetoDB = async (req, res) => {
     return res.status(500).json({ message: `Internal Server Error` });
   }
 };
+
+exports.uploadAirportCities = async (req, res) => {
+  try {
+    const savedAirports = await saveAirportsCities(req, res);
+    console.log(`${savedAirports.length} airports updated successfully`);
+    res
+      .status(200)
+      .json({
+        message: `${savedAirports.length} airports updated successfully`,
+      });
+  } catch (err) {
+    console.error(`An error occurred: ${err.message}`);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+
+
+}
