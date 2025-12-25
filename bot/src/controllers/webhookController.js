@@ -2,10 +2,11 @@ const { sendWhatsAppMessage, sendButtonMessage, schedulesFunction} = require("..
 const { getUserState, setUserState } = require("../utils/userState");
 const {
   getAirportsbyCity,
-  getAirportsbyIATA,
-  getFlightSchedulesbyIATA,
   mergeSchedules,
 } = require("../utils/database");
+
+
+
 
 exports.handleWebhookVerification = (req, res) => {
   const mode = req.query["hub.mode"];
@@ -21,6 +22,8 @@ exports.handleWebhookVerification = (req, res) => {
     }
   }
 };
+
+
 
 const processedMessages = new Set();
 

@@ -9,10 +9,10 @@ const { runFlightConsumer, runHistoricalFlightConsumer } = require("./events/fli
 const { runWeatherConsumer } = require("./events/weatherConsumer");
 const { runPredictionConsumer } = require("./events/predictionConsumer");
 
-const { fetchAllHistoricalFlightsData, fetchAllDailyFlights } = require("./controllers/flightController");
-const { fetchAllAirportsWeatherData } = require("../src/controllers/weatherController");
-// const { fetchAllData } = require("./controllers/combinedFetch");
-const { weatherTopic, flightTopic, predictionTopic, historicalFlightTopic } = require("../config/kafka");
+const { fetchAllData, runPeriodicJob } = require("./controllers/combinedFetch");
+const { fetchAllHistoricalFlightsData } = require("./controllers/flightController");
+// const { fetchAllAirportsWeatherData } = require("../src/controllers/weatherController");
+const { weatherTopic, flightTopic, predictionTopic, historicalFlightTopic, delay } = require("../config/env");
 const { createDoneFlag } = require("./events/flag_creator");
 
 // Middleware
@@ -33,8 +33,8 @@ app.listen(PORT, async () => {
 
     (async () => {
 
-      const batchTimeStart = Date.now();
-      console.log(`Batch process started at ${new Date(batchTimeStart).toISOString()}`);
+      // const batchTimeStart = Date.now();
+      // console.log(`Batch process started at ${new Date(batchTimeStart).toISOString()}`);
 
       //Start counting time for the completion of this process
       console.log("Initializing Kafka setup");
@@ -55,21 +55,25 @@ app.listen(PORT, async () => {
       await connectProducer();
 
       // Data fetching
-      console.log("Performing data fetch");
 
+      // console.log("Performing data fetch");
+      // console.time("Combined data fetch duration");
+      // await fetchAllData({years: 1});
+      // console.log("✅ Both data fetches completed.");
+      // console.timeEnd("Combined data fetch duration");
 
-      console.time("Combined data fetch duration");
-      // await fetchAllData();
-      await Promise.all([
-        fetchAllDailyFlights(),
-        fetchAllAirportsWeatherData({ years: 1 }),
-      ]);
-      console.log("✅ Both data fetches completed.");
-      console.timeEnd("Combined data fetch duration");
-      createDoneFlag(batchTimeStart);
+      // createDoneFlag(batchTimeStart);
 
-      await fetchAllHistoricalFlightsData({ days: 360 });
-      
+      // (async () => {
+      //   await runPeriodicJob({ years: 1 });
+      // })();
+
+      // (async () => {
+      //   await fetchAllHistoricalFlightsData({ days: 360 });
+      // })();
+
+      await runPeriodicJob();
+
     })();
 
   } catch (error) {

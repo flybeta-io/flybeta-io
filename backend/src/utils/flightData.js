@@ -1,21 +1,30 @@
 const Flight = require("../models/flight");
 const axios = require("axios");
-require("dotenv").config();
+// require("dotenv").config();
 const { Op, Sequelize } = require("sequelize");
 const { sendMessage } = require('../events/producer');
-const { flightTopic, historicalFlightTopic } = require("../../config/kafka");
+const {
+  REQUEST_DELAY_MS,
+  BACKDATE_HOURS_IN_MS,
+  FLIGHTS_HISTORY_BASE_URL,
+  TODAY_FLIGHTS_BASE_URL,
+  delay,
+  flightTopic,
+  historicalFlightTopic,
+} = require("../../config/env");
 
 
 /* ------------------------- Configuration Constants ------------------------- */
 
-const API_KEY = process.env.AVIATION_EDGE_API_KEY;
-const FLIGHTS_HISTORY_BASE_URL = `https://aviation-edge.com/v2/public/flightsHistory?key=${API_KEY}`;
-const TODAY_FLIGHTS_BASE_URL = `https://aviation-edge.com/v2/public/timetable?key=${API_KEY}`;
-const BackdateHoursInMS = 24 * 60 * 60 * 1000; // backdate for overlaps
 
 
-const REQUEST_DELAY_MS = 1000; // rate-limit delay between API calls
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// const API_KEY = process.env.AVIATION_EDGE_API_KEY;
+// const FLIGHTS_HISTORY_BASE_URL = `https://aviation-edge.com/v2/public/flightsHistory?key=${API_KEY}`;
+// const TODAY_FLIGHTS_BASE_URL = `https://aviation-edge.com/v2/public/timetable?key=${API_KEY}`;
+
+
+// const REQUEST_DELAY_MS = 1000; // rate-limit delay between API calls
+// const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 
 /* ------------------------- Helper Utility Functions ------------------------ */
@@ -44,9 +53,16 @@ exports.fetchFlightDatafromDB = async () => {
 
 
 // Function that takes in (2025-10-17t11:20:00.000) and returns new Date(2025-10-17 11:20:00.000)
-const refineDate = async (value) => {
+const refineDateHistorical = async (value) => {
   if (!value) return null;
   const [datePart, timePart] = value.split("t");
+  const refinedDateStr = `${datePart} ${timePart}`;
+  return new Date(refinedDateStr);
+};
+
+const refineDateDaily = async (value) => {
+  if (!value) return null;
+  const [datePart, timePart] = value.split("T");
   const refinedDateStr = `${datePart} ${timePart}`;
   return new Date(refinedDateStr);
 };
@@ -109,6 +125,10 @@ exports.saveFlightData = async (flightData) => {
 
 /* --------------------------- Core Fetching Logic --------------------------- */
 
+// ===============================================
+//            Historical Flight Schdedule
+// ===============================================
+
 // // Fetch and Save flight data for a single airport (by IATA)
 exports.fetchHistoricalFlightDataforSingleAirport = async (
   icao_code,
@@ -129,7 +149,7 @@ exports.fetchHistoricalFlightDataforSingleAirport = async (
   // Determine resume point
   const lastSavedDate = await getLastSavedFlightDateForIATA(iata_code);
   if (lastSavedDate) {
-    lastSavedDate.setTime(lastSavedDate.getTime() - BackdateHoursInMS);
+    lastSavedDate.setTime(lastSavedDate.getTime() - BACKDATE_HOURS_IN_MS);
     console.log(
       `                    ⏩ Resuming ${iata_code} from ${lastSavedDate.toISOString()}`
     );
@@ -178,15 +198,16 @@ exports.fetchHistoricalFlightDataforSingleAirport = async (
             airlineName: flight.airline.name.toUpperCase(),
             airlineIcaoCode: flight.airline.icaoCode.toUpperCase(),
             airlineIataCode: flight.airline.iataCode.toUpperCase(),
-            scheduledDepartureTime: await refineDate(
+            scheduledDepartureTime: await refineDateHistorical(
               flight.departure.scheduledTime
             ),
             actualDepartureTime:
-              (await refineDate(flight.departure.actualTime)) || null,
+              (await refineDateHistorical(flight.departure.actualTime)) || null,
             scheduledArrivalTime:
-              (await refineDate(flight.arrival.scheduledTime)) || null,
+              (await refineDateHistorical(flight.arrival.scheduledTime)) ||
+              null,
             actualArrivalTime:
-              (await refineDate(flight.arrival.actualTime)) || null,
+              (await refineDateHistorical(flight.arrival.actualTime)) || null,
             originAirportIata: flight.departure.iataCode.toUpperCase(),
             destinationAirportIata: flight.arrival.iataCode.toUpperCase(),
             delay: flight.departure.delay || null,
@@ -245,6 +266,11 @@ exports.fetchHistoricalFlightDataforSingleAirport = async (
 };
 
 
+// ===============================================
+//            Daily Flight Schdedule
+// ===============================================
+
+
 // Daily Flights
 exports.fetchDailyFlightSchedule = async (
   icao_code,
@@ -270,22 +296,22 @@ exports.fetchDailyFlightSchedule = async (
     fetchedFlights += flights.length;
 
     for (const flight of flights) {
-      //Skip if destination ICAO code is missing in Airport DB
-      if (iataCodesInDB.has(flight.arrival.iataCode.toUpperCase())) {
+      //Skip if destination ICAO code is missing in Airport DB or Scheduled Departure Time is null
+      if (iataCodesInDB.has(flight.arrival.iataCode.toUpperCase()) && (flight.departure.scheduledTime != null)) {
         const flightRecord = {
           flightID: flight.flight.iataNumber.toUpperCase(),
           airlineName: flight.airline.name.toUpperCase(),
           airlineIcaoCode: flight.airline.icaoCode.toUpperCase(),
           airlineIataCode: flight.airline.iataCode.toUpperCase(),
-          scheduledDepartureTime: await refineDate(
+          scheduledDepartureTime: await refineDateDaily(
             flight.departure.scheduledTime
           ),
           actualDepartureTime:
-            (await refineDate(flight.departure.actualTime)) || null,
+            (await refineDateDaily(flight.departure.actualTime)) || null,
           scheduledArrivalTime:
-            (await refineDate(flight.arrival.scheduledTime)) || null,
+            (await refineDateDaily(flight.arrival.scheduledTime)) || null,
           actualArrivalTime:
-            (await refineDate(flight.arrival.actualTime)) || null,
+            (await refineDateDaily(flight.arrival.actualTime)) || null,
           originAirportIata: flight.departure.iataCode.toUpperCase(),
           destinationAirportIata: flight.arrival.iataCode.toUpperCase(),
           delay: flight.departure.delay || null,

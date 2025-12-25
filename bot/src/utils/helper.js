@@ -63,7 +63,7 @@ exports.sendButtonMessage = async (to, bodyText, buttons) => {
 
 
 
-// Generate sting
-exports.schedulesFunction = async (flight) => {
-  return `\nFlightID: ${flight.flightID}\nAirline Name: ${flight.airlineName}\nOrigin Airport: ${flight.originAirport} (${flight.originAirportIata}) \nDestination Airport: ${flight.destAirport} (${flight.destAirportIata})\nDeparture Time: ${flight.departureTime}`;
-}
+// // Generate sting
+// exports.schedulesFunction = async (flight) => {
+//   return `\nFlightID: ${flight.flightID}\nAirline Name: ${flight.airlineName}\nOrigin Airport: ${flight.originAirport} (${flight.originAirportIata}) \nDestination Airport: ${flight.destAirport} (${flight.destAirportIata})\nDeparture Time: ${flight.departureTime}`;
+// }

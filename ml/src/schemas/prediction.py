@@ -6,7 +6,7 @@ class PredictionRequest(BaseModel):
     origin_precip_mm: float
     origin_precip_prob_pct: float
     origin_wind_speed_kmph: float
-    origin_wind_dir_deg: int
+    origin_wind_dir_deg: float
     origin_temp_c: float
     origin_humidity_pct: float
     origin_pressure_mb: float

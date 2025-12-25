@@ -1,8 +1,9 @@
 const fs = require("fs");
-const path = require("path");
+require("dotenv").config();
+const { flagPath } = require("../../config/env");
+
 
 const createDoneFlag = (batchTimeStart) => {
-  const flagPath = "/opt/flags/batch_done.txt";
   fs.writeFileSync(flagPath, batchTimeStart.toString());
   console.log(`Batch DONE flag created at ${flagPath}`);
 };

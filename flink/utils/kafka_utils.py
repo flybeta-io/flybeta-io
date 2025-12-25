@@ -2,10 +2,13 @@ import json
 import os
 from kafka import KafkaProducer, KafkaConsumer
 from pyflink.table import StreamTableEnvironment
+from dotenv import load_dotenv
+from job.settings import FLAG_PATH
 
 
 BOOTSTRAP = "kafka:9092"
-FLAG_PATH = "/opt/flags/batch_done.txt"
+# FLAG_PATH = os.getenv("FLAG_PATH")
+
 
 # -------------------------
 # Producer

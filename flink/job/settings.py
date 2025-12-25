@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 
 load_dotenv()
 
@@ -11,6 +12,9 @@ FLIGHT_TOPIC = os.getenv("FLIGHT_TOPIC")
 PREDICTION_TOPIC = os.getenv("PREDICTION_TOPIC")
 
 GROUP_ID = "flink-group"
+
+raw_path = os.getenv("FLAG_PATH")
+FLAG_PATH = Path(raw_path)
 
 feature_order = [
     "airline_name",

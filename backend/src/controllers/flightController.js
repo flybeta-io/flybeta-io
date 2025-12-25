@@ -4,8 +4,6 @@ const { fetchAirportsDatafromDB } = require('../utils/airportData');
 // const { getAirportsCache } = require('../utils/cache');
 const Flight = require("../models/flight");
 const { fetchFlightDatafromDB } = require("../utils/flightData");
-const redisClient = require("../../config/redisClient");
-const { LONG_TERM_IN_SECONDS_REDIS } = require("../../config/env");
 
 
 // Save the missing airport IcaoCodes in DB
@@ -39,12 +37,17 @@ exports.saveMissingIcaoCodes = async () => {
 
 /* ----------------------------- Main Controller ----------------------------- */
 
+// ===============================================
+//            Historical Flight Schdedule
+// ===============================================
+
 /**
  * Fetch and save departure flights for all airports.
  */
 exports.fetchAllHistoricalFlightsData = async ({ days = null, years = null }) => {
   console.log(`                      Fetching Airports Data for Historical Flights Operation`);
   const airports = await fetchAirportsDatafromDB();
+  console.log(`                    ✅Loaded ${airports.length} airports for historical flight operation`);
 
   if (!airports.length) {
     console.warn("                    No IATA codes found in database.");
@@ -92,11 +95,16 @@ exports.fetchAllHistoricalFlightsData = async ({ days = null, years = null }) =>
 };
 
 
+// ===============================================
+//            Daily Flight Schdedule
+// ===============================================
+
 exports.fetchAllDailyFlights = async () => {
   console.log(
-    `                      Fetching Airports Data for Daily Flights Operation`
+    `                      ✅Fetching Airports Data for Daily Flights Operation`
   );
   const airports = await fetchAirportsDatafromDB();
+  console.log(`                      ✅Loaded ${airports.length} airports for flights operation`);
 
   if (!airports.length) {
     console.warn("                    No IATA codes found in database.");

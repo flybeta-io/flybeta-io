@@ -1,5 +1,5 @@
 const { Kafka } = require("kafkajs");
-require("dotenv").config();
+// require("dotenv").config();
 
 const kafka = new Kafka({
   clientId: "flybeta-app",
@@ -15,16 +15,5 @@ const kafka = new Kafka({
 // brokers: ["kafka:29092"], // connects to Docker Kafka if running node in Docker
 // brokers: ["localhost:29092"], // connects to Docker Kafka if running node locally
 
-const weatherTopic = process.env.WEATHER_TOPIC;
-const flightTopic = process.env.FLIGHT_TOPIC;
-const predictionTopic = process.env.PREDICTION_TOPIC;
-const historicalFlightTopic = process.env.HISTORICAL_FLIGHT_TOPIC;
 
-
-module.exports = {
-  kafka,
-  weatherTopic,
-  flightTopic,
-  predictionTopic,
-  historicalFlightTopic
-};
+module.exports = { kafka };

@@ -45,12 +45,12 @@ NG_AIRPORTS = {
 
 def select_ng_airports(df: pd.DataFrame, logger) -> pd.DataFrame:
     """Filter to only Nigerian airports."""
-    logger.info("Filtering to Nigerian airports...")
+    logger.info(f"Filtering {df.shape[0]:,} records to Nigerian airports...")
 
     mask = df["originIata"].isin(NG_AIRPORTS) & df["destIata"].isin(NG_AIRPORTS)
 
     df = cast(pd.DataFrame, df.loc[mask, :].reset_index(drop=True))
-    logger.info(f"Filtered to Nigerian airports.")
+    logger.info(f"Filtered to Nigerian airports. ({df.shape[0]:,} records left)")
     return df
 
 def remove_same_origin_destination(df: pd.DataFrame, logger) -> pd.DataFrame:

@@ -2,17 +2,16 @@ const fs = require("fs");
 const csv = require("csv-parser");
 const Airport = require("../models/airport.js");
 const { Op } = require("sequelize");
-const { default: axios } = require("axios");
+const { axios } = require("axios");
 require("dotenv").config();
 const redisClient = require("../../config/redisClient.js");
-const EXPIRATION_TIME_IN_SECONDS = 24 * 60 * 60;
+const {
+  LONG_TERM_IN_SECONDS_REDIS,
+  REQUEST_DELAY_MS,
+  delay,
+  AIRPORTS_DATABASE_BASE_URL,
+} = require("../../config/env.js");
 
-
-const Api_key = process.env.AVIATION_EDGE_API_KEY;
-const airportsBaseUrl = "https://aviation-edge.com/v2/public/airportDatabase";
-
-const REQUEST_DELAY_MS = 500;
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 
 // --- Validation ---
@@ -131,6 +130,7 @@ exports.fetchAirportsDatafromDB = async () => {
     const value = await redisClient.get(key);
 
     if (value) {
+      console.log(`Loaded From Redis`)
       return JSON.parse(value);
     }
 
@@ -141,12 +141,7 @@ exports.fetchAirportsDatafromDB = async () => {
     });
 
     const valueInString = JSON.stringify(airports);
-    await redisClient.set(
-              key,
-              valueInString,
-              "EX",
-              EXPIRATION_TIME_IN_SECONDS
-            );
+    await redisClient.set(key, valueInString, "EX", LONG_TERM_IN_SECONDS_REDIS);
     return airports;
   } catch (error) {
     console.error("Error fetching airport data: ", error);
@@ -175,7 +170,7 @@ exports.fetchandSaveAirportsToDB = async (
   icaoCodesInDB
 ) => {
   try {
-    const url = `${airportsBaseUrl}?key=${Api_key}&codeIso2Country=${iso}`;
+    const url = `${AIRPORTS_DATABASE_BASE_URL}&codeIso2Country=${iso}`;
     const response = await axios.get(url);
     const airports = response.data;
 
@@ -234,7 +229,7 @@ exports.fetchandSaveCountryISO2CountryCode = async () => {
 
     for (const code of iataCodes) {
       try {
-        const url = `${airportsBaseUrl}?key=${Api_key}&codeIataAirport=${code}`;
+        const url = `${AIRPORTS_DATABASE_BASE_URL}&codeIataAirport=${code}`;
         const response = await axios.get(url);
         const airportData = response.data?.[0];
 

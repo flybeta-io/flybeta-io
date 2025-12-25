@@ -49,6 +49,8 @@ def merge_weather_forecast_serving(
         tolerance=pd.Timedelta('2h')
     )
 
+    logger.info(f"{flights_with_origin.shape[0]:,} records left")
+
     # --- 3. DESTINATION MERGE (Arrival Time) ---
     logger.info("Merging DESTINATION weather (using Arrival Time)...")
 
@@ -66,6 +68,8 @@ def merge_weather_forecast_serving(
     )
 
     merged_data = flights_with_both.copy()
+
+    logger.info(f"{merged_data.shape[0]:,} records left")
 
     # --- 4. CLEANUP ---
     logger.info("Dropping redundant columns...")

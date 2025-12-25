@@ -2,7 +2,9 @@ import json
 import asyncio
 import pandas as pd
 import httpx
+import os
 
+from pyflink.common import Configuration, RestartStrategies
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment, EnvironmentSettings
 
@@ -21,9 +23,9 @@ from transformers.custom_transformers import (
 
 from predictors.stage_predictor import process_record
 
-from settings import WEATHER_TOPIC, FLIGHT_TOPIC, PREDICTION_TOPIC, feature_order
+from settings import WEATHER_TOPIC, FLIGHT_TOPIC, PREDICTION_TOPIC, feature_order, FLAG_PATH
 
-semaphore = asyncio.Semaphore(20)  # limit concurrency to 20
+semaphore = asyncio.Semaphore(10)  # limit concurrency to 10
 
 batch_size = 100
 
@@ -43,6 +45,7 @@ async def safe_process_record(payload, expected_cols_stage1, expected_cols_stage
             await asyncio.sleep(1.5)  # brief delay before retry
 
 
+
 # ==================================================
 #   FLINK MAIN PIPELINE
 # ==================================================
@@ -51,10 +54,19 @@ async def safe_process_record(payload, expected_cols_stage1, expected_cols_stage
 async def run_pipeline():
     logger = get_logger("FLINK")
 
+
+    # Increase buffer from 2MB to 20MB
+    config = Configuration()
+    config.set_string("collect-sink.batch-size.max", "20971520")
+
+    config.set_string("restart-strategy", "fixed-delay")
+    config.set_string("restart-strategy.fixed-delay.attempts", "3")
+    config.set_string("restart-strategy.fixed-delay.delay", "10000 ms")
+
     # -----------------------------
     #  FLINK ENV (IN BATCH MODE)
     # -----------------------------
-    env = StreamExecutionEnvironment.get_execution_environment()
+    env = StreamExecutionEnvironment.get_execution_environment(config)
     settings = EnvironmentSettings.new_instance().in_streaming_mode().build()
     t_env = StreamTableEnvironment.create(env, environment_settings=settings)
 
@@ -96,6 +108,13 @@ async def run_pipeline():
 
     # Merge
     merged_df = merge_weather_forecast_serving(flights_df, weather_df, logger)
+
+
+    # # ---------------------------
+    # # Remove Flag so backend can continue fetching data
+    # # ---------------------------
+    # os.remove(FLAG_PATH)  # clean up
+    # print("${FLAG_PATH} path removed. Moving to the next batch")
 
 
     # -----------------------------

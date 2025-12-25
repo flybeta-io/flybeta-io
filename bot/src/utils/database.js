@@ -2,12 +2,7 @@ const Airport = require("../models/airport");
 const Flight = require("../models/flight");
 const { Op } = require("sequelize");
 const redisClient = require("../../config/redisClient");
-
-
-const LONG_TERM_IN_SECONDS = 24 * 60 * 60;
-const SHORT_TERM_IN_SECONDS = 1 * 60 * 60;
-
-
+const { SHORT_TERM_IN_SECONDS_REDIS, LONG_TERM_IN_SECONDS_REDIS } = require("../../config/env");
 
 
 const getAirportsbyCity = async (city) => {
@@ -35,7 +30,7 @@ const getAirportsbyCity = async (city) => {
           key,
           valueInString,
           "EX",
-          LONG_TERM_IN_SECONDS
+          LONG_TERM_IN_SECONDS_REDIS
         );
 
         return airports
@@ -67,7 +62,7 @@ const getAirportsbyIATA = async (iata_code) => {
         key,
         valueInString,
         "EX",
-        LONG_TERM_IN_SECONDS
+        LONG_TERM_IN_SECONDS_REDIS
       );
 
       return airport;
@@ -118,7 +113,12 @@ const getFlightSchedulesbyIATA = async (origin, dest, departure_date) => {
         });
 
         const valueInString = JSON.stringify(flights);
-        await redisClient.set(key, valueInString, "EX", SHORT_TERM_IN_SECONDS);
+        await redisClient.set(
+          key,
+          valueInString,
+          "EX",
+          SHORT_TERM_IN_SECONDS_REDIS
+        );
 
         return flights;
     } catch (error) {
@@ -130,7 +130,7 @@ const getFlightSchedulesbyIATA = async (origin, dest, departure_date) => {
 }
 
 
-const   mergeSchedules = async (originCity, destCity, departure_date) => {
+const mergeSchedules = async (originCity, destCity, departure_date) => {
   const flightSchedules = [];
 
   const key = `${originCity.toLowerCase()}_${destCity.toLowerCase()}_${departure_date.toUpperCase()}_all_flights`;
@@ -183,7 +183,12 @@ const   mergeSchedules = async (originCity, destCity, departure_date) => {
     }
   }
     const valueInString = JSON.stringify(flightSchedules);
-    await redisClient.set(key, valueInString, "EX", SHORT_TERM_IN_SECONDS);
+    await redisClient.set(
+      key,
+      valueInString,
+      "EX",
+      SHORT_TERM_IN_SECONDS_REDIS
+    );
 
     return flightSchedules;
 };

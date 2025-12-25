@@ -1,5 +1,6 @@
 const redisClient = require("../../config/redisClient");
-const expirationTimeInSeconds = 60 * 5; // 5 minutes
+const { USER_STATE_MANAGEMENT_IN_SECONDS } = require("../../config/env");
+
 
 const getUserState = async (phone) => {
     try {
@@ -19,7 +20,12 @@ const setUserState = async (phone, step, newData = {}) => {
         currentState.step = step;
         currentState.data = { ...currentState.data, ...newData };
 
-        await redisClient.set(`session:${phone}`, JSON.stringify(currentState), 'EX', expirationTimeInSeconds);
+        await redisClient.set(
+          `session:${phone}`,
+          JSON.stringify(currentState),
+          "EX",
+          USER_STATE_MANAGEMENT_IN_SECONDS
+        );
 
         console.log(`💾 State updated for ${phone}: ${step}`)
     } catch (err) {

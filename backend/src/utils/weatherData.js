@@ -2,19 +2,28 @@ const axios = require("axios");
 const Weather = require("../models/weather");
 require("dotenv").config();
 const { sendMessage } = require('../events/producer');
-const { weatherTopic } = require("../../config/kafka");
+const { weatherTopic } = require("../../config/env");
+
+const {
+  REQUEST_DELAY_MS,
+  BACKDATE_HOURS_IN_MS,
+  VC_BASE_URL,
+  VC_API_KEY,
+  delay
+} = require("../../config/env");
 
 
-const API_KEY = process.env.VISUAL_CROSSING_API_KEY;
-const BASE_URL =
-  "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline";
-const REQUEST_DELAY_MS = 1000; // rate-limit delay between API calls
-const BackdateHoursInMS = 24 * 60 * 60 * 1000; // safety buffer
+// const API_KEY = process.env.VISUAL_CROSSING_API_KEY;
+// const BASE_URL =
+//   "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline";
+// const REQUEST_DELAY_MS = 1000; // rate-limit delay between API calls
+
 
 /* ------------------------- Helper Utility Functions ------------------------ */
 
 /** Sleep for rate limiting */
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 
 /** Get the most recent saved datetime for a specific ICAO code */
 const getLastSavedWeatherDateForICAO = async (icao_code) => {
@@ -80,7 +89,7 @@ exports.fetchSingleAirportWeatherData = async (
   // Determine resume point. Backdate by 24 hours
   const lastSavedDate = await getLastSavedWeatherDateForICAO(icao_code);
   if (lastSavedDate) {
-    lastSavedDate.setTime(lastSavedDate.getTime() - BackdateHoursInMS);
+    lastSavedDate.setTime(lastSavedDate.getTime() - BACKDATE_HOURS_IN_MS);
     console.log(`⏩ Resuming ${icao_code} from ${lastSavedDate.toISOString()}`);
   }
 
@@ -97,7 +106,7 @@ exports.fetchSingleAirportWeatherData = async (
         : start;
 
     // Construct API URL
-    const url = `${BASE_URL}/${location}/${chunkStart}/${end}?unitGroup=metric&include=hours&key=${API_KEY}`;
+    const url = `${VC_BASE_URL}/${location}/${chunkStart}/${end}?unitGroup=metric&include=hours&key=${VC_API_KEY}`;
     console.log(` Fetching ${icao_code} (${chunkStart} → ${end})...`);
 
     try {
