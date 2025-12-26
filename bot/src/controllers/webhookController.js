@@ -1,12 +1,35 @@
-const { sendWhatsAppMessage, sendButtonMessage, schedulesFunction} = require("../utils/helper");
+const {
+  sendWhatsAppMessage,
+  sendButtonMessage,
+  sendPaginatedOptions,
+} = require("../utils/helper");
 const { getUserState, setUserState } = require("../utils/userState");
 const {
-  getAirportsbyCity,
-  mergeSchedules,
+  citiesToArr,
+  getAirlines,
+  fetchDatewithAirline,
+  fetchUserQuery,
 } = require("../utils/database");
+const { USER_STATE_MANAGEMENT_IN_SECONDS } = require("../../config/env");
 
+// ==========================================
+// CONFIGURATION & DATA
+// ==========================================
 
+// const CITIES = ["Lagos", "Abuja", "Kano", "Port Harcourt", "Enugu", "Owerri", "Ibadan", "Benin"];
+// const AIRLINES = ["Air Peace", "Ibom Air", "Arik Air", "Dana Air", "Green Africa", "Overland"];
+// const TIMES = [
+//   "Morning (6am-11am)",
+//   "Afternoon (12pm-4pm)",
+//   "Evening (5pm-9pm)",
+// ];
+let CITIES;
+let AIRLINES;
+let TIMES;
 
+// ========================================
+// WEBHOOKS
+// ========================================
 
 exports.handleWebhookVerification = (req, res) => {
   const mode = req.query["hub.mode"];
@@ -22,8 +45,6 @@ exports.handleWebhookVerification = (req, res) => {
     }
   }
 };
-
-
 
 const processedMessages = new Set();
 
@@ -47,7 +68,7 @@ exports.handleIncomingMessages = async (req, res) => {
 
         setTimeout(() => {
           processedMessages.delete(messageId);
-        }, 5 * 60 * 1000); // 5 minute
+        }, USER_STATE_MANAGEMENT_IN_SECONDS * 1000); //
 
         const session = await getUserState(from);
         const currentStep = session.step;
@@ -59,104 +80,17 @@ exports.handleIncomingMessages = async (req, res) => {
           const text = message.text.body.toLowerCase().trim();
           console.log(`Received text message: ${text} from ${from}`);
 
-          // --- Logic: Check State BEFORE replying ---
-          if (currentStep === "WAITING_ORIGIN") {
-            const resultOrigin = await getAirportsbyCity(text);
-            // console.log(resultOrigin);
+          // Send "Welcome" Text
+          await sendWhatsAppMessage(
+            from,
+            "Welcome to FlyBeta! ✈️\nWe predict flight delays."
+          );
 
-            if (!resultOrigin) {
-              await sendWhatsAppMessage(
-                from,
-                `Unable to determine the city: ${text}.\nPlease enter a valid city`
-              );
-              return;
-            }
-            await setUserState(from, "WAITING_DESTINATION", { origin: text });
-            await sendWhatsAppMessage(from, `Got it! Flying from ${text}.`);
-            await sendWhatsAppMessage(
-              from,
-              "Where are you flying to? (e.g., New York, London)."
-            );
-          } else if (currentStep === "WAITING_DESTINATION") {
-            const resultDest = await getAirportsbyCity(text);
-            // console.log(resultDest);
-
-            if (!resultDest) {
-              await sendWhatsAppMessage(
-                from,
-                `Unable to determine the city: ${text}.\nPlease enter a valid city`
-              );
-              return;
-            }
-
-            await setUserState(from, "WAITING_DEPARTURE_DATE", {
-              destination: text,
-            });
-            await sendWhatsAppMessage(from, `Okay, flying to ${text}.`);
-            await sendWhatsAppMessage(
-              from,
-              "When is your flight? (e.g., DD/MM/YYYY)"
-            );
-          } else if (currentStep === "WAITING_DEPARTURE_DATE") {
-            // User is answering "Date"
-            await setUserState(from, "RETRIEVE_FLIGHT_DELAY_PREDICTION", {
-              departure_date: text,
-            });
-
-            // Get the final data we just saved
-            const finalData = { ...session.data, departure_date: text };
-
-            await sendWhatsAppMessage(
-              from,
-              `All set! ✈️\nOrigin: ${finalData.origin}\nDestination: ${finalData.destination}\nDeparture Date: ${text}`
-            );
-            await sendWhatsAppMessage(from, "Retrieving flight schedules...");
-
-            const originCity = session.data.origin;
-            const destCity = session.data.destination;
-
-            // Flight Schedules
-            const schedules = await mergeSchedules(
-              originCity,
-              destCity,
-              text
-            );
-            console.log(`Retrieved ${schedules.length} flight schedules`);
-            await sendWhatsAppMessage(
-              from,
-              `Retrieved ${schedules.length} flight schedules`
-            );
-
-            for (let i = 0; i < schedules.length; i++) {
-              const flight = schedules[i];
-              await sendWhatsAppMessage(
-                from,
-                `------------${i + 1}------------ ${await schedulesFunction(flight)}`
-              );
-            }
-
-            await sendWhatsAppMessage(
-              from,
-              "Enter the number corresponding to a flight to get the delay prediction"
-            );
-
-          } else if (currentStep === "RETRIEVE_FLIGHT_DELAY_PREDICTION") {
-            await setUserState(from, "IDLE");
-
-
-          } else {
-            // Step A: Send "Welcome" Text
-            await sendWhatsAppMessage(
-              from,
-              "Welcome to FlyBeta! ✈️\nWe do predict flight delays."
-            );
-
-            // Step B: Send "Would you like to get started?" with Buttons
-            await sendButtonMessage(from, "Would you like to get started?", [
-              { id: "btn_yes", title: "Yes" },
-              { id: "btn_no", title: "No" },
-            ]);
-          }
+          // Send "Would you like to get started?" with Buttons
+          await sendButtonMessage(from, "Would you like to get started?", [
+            { id: "btn_yes", title: "Yes" },
+            { id: "btn_no", title: "No" },
+          ]);
 
           // =====================================================
           // SCENARIO B: BUTTON CLICKS
@@ -164,30 +98,183 @@ exports.handleIncomingMessages = async (req, res) => {
         } else if (message.type === "interactive") {
           const buttonReply = message.interactive.button_reply;
           const buttonId = buttonReply.id;
+
           console.log(`Received button click: ${buttonId} from ${from}`);
 
+          // ===========================
+          //  YES OR NO (START)
+          // ===========================
           if (buttonId === "btn_yes") {
-            await setUserState(from, "WAITING_ORIGIN");
-            await sendWhatsAppMessage(
-              from,
-              "Great! To get started, please provide your flight details."
-            );
+            await setUserState(from, "SELECTING_ORIGIN");
+            CITIES = await citiesToArr();
             await sendWhatsAppMessage(
               from,
               "Where are you flying from? (e.g., Lagos, Abuja)."
             );
+            await sendPaginatedOptions(
+              from,
+              "Select your Origin City:",
+              CITIES,
+              0,
+              "origin"
+            );
           } else if (buttonId === "btn_no") {
             await setUserState(from, "IDLE");
-            await sendWhatsAppMessage(
-              from,
-              "No worries! If you change your mind, just let us know."
-            );
+            await sendWhatsAppMessage(from, "No worries! Text us anytime.");
+
+            // ===========================
+            //  PAGINATION (NEXT)
+            // ===========================
+          } else if (buttonId.startsWith("next_")) {
+            // Format: next_TYPE_PAGE (e.g., next_origin_1)
+            const [_, type, pageStr] = buttonId.split("_");
+            const page = parseInt(pageStr);
+
+            let list = [];
+            let prompt = "";
+
+            if (type === "origin") {
+              list = CITIES;
+              prompt = "Select Origin:";
+            } else if (type === "dest") {
+              list = CITIES;
+              prompt = "Select Destination:";
+            } else if (type === "airline") {
+              userData = session.data;
+              AIRLINES = await getAirlines(
+                userData.origin,
+                userData.destination
+              );
+              list = AIRLINES;
+              prompt = "Select Airline:";
+            } else if (type === "time") {
+              userData = session.data;
+              TIMES = await fetchDatewithAirline(
+                userData.origin,
+                userData.destination,
+                userData.airline
+              );
+              list = TIMES;
+              prompt = "Select Time:";
+            }
+
+            await sendPaginatedOptions(from, prompt, list, page, type);
+
+            // --- 3. SELECTION HANDLER (User picked an item) ---
+          } else if (buttonId.startsWith("sel_")) {
+            // Format: sel_TYPE_VALUE (e.g., sel_origin_Lagos)
+            const parts = buttonId.split("_");
+            const type = parts[1]; // origin, dest, airline, time
+            const value = parts.slice(2).join(" "); // "New York" (handles spaces)
+
+            // ===========================
+            //  SELECT ORIGIN
+            // ===========================
+            if (type === "origin") {
+              await setUserState(from, "SELECTING_DESTINATION", {
+                origin: value,
+              });
+              await sendWhatsAppMessage(from, `✅ Origin set to ${value}`);
+              await sendWhatsAppMessage(from, `Where are you flying to`);
+              // Trigger Next Step: Destination
+              await sendPaginatedOptions(
+                from,
+                "Select your Destination:",
+                CITIES,
+                0,
+                "dest"
+              );
+
+              // ===========================
+              //  SELECT DESTINATION
+              // ===========================
+            } else if (type === "dest") {
+              await setUserState(from, "SELECTING_AIRLINE", {
+                destination: value,
+              });
+              await sendWhatsAppMessage(from, `✅ Destination set to ${value}`);
+              // Trigger Next Step: Airline
+              AIRLINES = await getAirlines(session.data.origin, value);
+              await sendPaginatedOptions(
+                from,
+                "Select your Airline:",
+                AIRLINES,
+                0,
+                "airline"
+              );
+
+              // ===========================
+              // SELECT AIRLINE
+              // ===========================
+            } else if (type === "airline") {
+              await setUserState(from, "SELECTING_TIME", { airline: value });
+              await sendWhatsAppMessage(from, `✅ Airline set to ${value}`);
+              // Trigger Next Step: Time
+              userData = session.data;
+              TIMES = await fetchDatewithAirline(
+                userData.origin,
+                userData.destination,
+                value
+              );
+              console.log(TIMES);
+              await sendPaginatedOptions(
+                from,
+                "Select Departure Time:",
+                TIMES,
+                0,
+                "time"
+              );
+
+              // ===========================
+              // SELECT TIME
+              // ===========================
+            } else if (type === "time") {
+              const finalData = { ...session.data, time: value };
+
+              await sendWhatsAppMessage(
+                from,
+                `📝 Summary:\nFrom: ${finalData.origin}\nTo: ${finalData.destination}\nAirline: ${finalData.airline}\nTime: ${value}\n\nFetching predictions... ⏳`
+              );
+
+              // ===========================
+              // PREDICTION LOGIC
+              // ===========================
+              userData = session.data;
+              const [userQuery, prediction] = await fetchUserQuery(
+                userData.origin,
+                userData.destination,
+                userData.airline,
+                value
+              );
+              // console.log(results)
+
+              await sendWhatsAppMessage(
+                from,
+                `Flight ID: ${userQuery.flightID} \nAirline Name: ${userQuery.airlineName} \nOrigin Airport: ${userQuery.originAirport} (${userQuery.originAirportIata}) \nDestination Airport: ${userQuery.destAirport} (${userQuery.destAirportIata}) \nDeparture Time: ${userQuery.scheduledDepartureTime}`
+              );
+
+              if (prediction === null) {
+                await sendWhatsAppMessage(
+                  from,
+                  `⚠️ No predictions available for this selection.`
+                );
+                return;
+              }
+
+              // await sendWhatsAppMessage(from, results);
+
+              // Example:
+              // const schedules = await mergeSchedules(finalData.origin, finalData.destination, ...);
+              // ... rest of your logic
+
+              await setUserState(from, "IDLE", { time: value }); // Reset state
+            }
           }
         }
+        res.sendStatus(200);
+      } else {
+        res.sendStatus(404);
       }
-      res.sendStatus(200);
-    } else {
-      res.sendStatus(404);
     }
   } catch (error) {
     console.error("ERROR in Webhook:", error);

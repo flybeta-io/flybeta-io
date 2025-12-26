@@ -79,7 +79,7 @@ def merge_weather_forecast_serving(
     merged_data["unique_key"] = (
         merged_data["airline_iata_code"].astype(str)
         + "_"
-        + merged_data["sched_dep_time"].dt.strftime("%Y-%m-%d")
+        + merged_data["sched_dep_time"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         + "_"
         + merged_data["originIata"].astype(str)
         + "_"

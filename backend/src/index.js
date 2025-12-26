@@ -10,7 +10,7 @@ const { runWeatherConsumer } = require("./events/weatherConsumer");
 const { runPredictionConsumer } = require("./events/predictionConsumer");
 
 const { fetchAllData, runPeriodicJob } = require("./controllers/combinedFetch");
-const { fetchAllHistoricalFlightsData } = require("./controllers/flightController");
+// const { fetchAllHistoricalFlightsData } = require("./controllers/flightController");
 // const { fetchAllAirportsWeatherData } = require("../src/controllers/weatherController");
 const { weatherTopic, flightTopic, predictionTopic, historicalFlightTopic, delay } = require("../config/env");
 const { createDoneFlag } = require("./events/flag_creator");

@@ -280,7 +280,7 @@ exports.saveAirportsCities = async (req, res) => {
               name: data.airport_name?.trim(),
               icao_code: data.icao?.trim(),
               iata_code: data.iata?.trim(),
-              city: data.city_served?.trim().toLowerCase()
+              city: data.city_served?.trim()
             };
 
             results.push(airportData);
