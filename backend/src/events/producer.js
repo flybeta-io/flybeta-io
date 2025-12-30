@@ -19,7 +19,7 @@ const sendMessage = async (topic, message) => {
             { value: JSON.stringify(message) },
         ],
     });
-    console.log(`Message sent to topic ${topic}`);
+    // console.log(`Message sent to topic ${topic}`);
 }
 
 module.exports = {

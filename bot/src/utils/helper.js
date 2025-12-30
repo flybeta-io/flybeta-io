@@ -1,5 +1,5 @@
 const axios = require("axios");
-
+const { MESSAGE_SEND_TTL_IN_SECONDS } = require("../../config/env");
 const ITEMS_PER_PAGE = 2; // We use 2 items so the 3rd button can be "Next"
 
 // Helper: Send Message
@@ -11,11 +11,13 @@ const sendWhatsAppMessage = async (to, text) => {
         messaging_product: "whatsapp",
         to: to,
         type: "text",
+        message_send_ttl_seconds: `${MESSAGE_SEND_TTL_IN_SECONDS}`,
         text: { body: text },
       },
       {
         headers: {
           Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
         },
       }
     );
@@ -27,40 +29,46 @@ const sendWhatsAppMessage = async (to, text) => {
   }
 };
 
-
 // Helper: Send Interactive Button Message (Max 3 buttons)
 const sendButtonMessage = async (to, bodyText, buttons) => {
-    try {
-        await axios.post(
-            `https://graph.facebook.com/v22.0/${process.env.PHONE_NUMBER_ID}/messages`,
-            {
-                messaging_product: "whatsapp",
-                to: to,
-                type: "interactive",
-                interactive: {
-                    type: "button",
-                    body: {
-                        text: bodyText
-                    },
-                    action: {
-                        // Map your simple array to the complex WhatsApp format
-                        buttons: buttons.map((btn, index) => ({
-                            type: "reply",
-                            reply: {
-                                id: btn.id,       // Unique ID for your code to track (e.g., "btn_yes")
-                                title: btn.title  // Text user sees (Max 20 chars)
-                            }
-                        }))
-                    }
-                }
-            },
-            {
-                headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
-            }
-        );
-    } catch (err) {
-        console.error('Button Error:', err.response ? err.response.data : err.message);
-    }
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v22.0/${process.env.PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: to,
+        type: "interactive",
+        message_send_ttl_seconds: `${MESSAGE_SEND_TTL_IN_SECONDS}`,
+        interactive: {
+          type: "button",
+          body: {
+            text: bodyText,
+          },
+          action: {
+            // Map your simple array to the complex WhatsApp format
+            buttons: buttons.map((btn, index) => ({
+              type: "reply",
+              reply: {
+                id: btn.id, // Unique ID for your code to track (e.g., "btn_yes")
+                title: btn.title, // Text user sees (Max 20 chars)
+              },
+            })),
+          },
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  } catch (err) {
+    console.error(
+      "Button Error:",
+      err.response ? err.response.data : err.message
+    );
+  }
 };
 
 

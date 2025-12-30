@@ -149,7 +149,8 @@ exports.fetchHistoricalFlightDataforSingleAirport = async (
   // Determine resume point
   const lastSavedDate = await getLastSavedFlightDateForIATA(iata_code);
   if (lastSavedDate) {
-    lastSavedDate.setTime(lastSavedDate.getTime() - BACKDATE_HOURS_IN_MS);
+    // lastSavedDate.setDate(lastSavedDate)
+    lastSavedDate.setTime(lastSavedDate.getTime() - (5 * BACKDATE_HOURS_IN_MS));
     console.log(
       `                    ⏩ Resuming ${iata_code} from ${lastSavedDate.toISOString()}`
     );

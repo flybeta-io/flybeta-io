@@ -7,7 +7,8 @@ const {
   SHORT_TERM_IN_SECONDS_REDIS,
   LONG_TERM_IN_SECONDS_REDIS,
 } = require("../../config/env");
-const { UPDATE } = require("sequelize/lib/query-types");
+
+
 
 // =========== GET TODAY DATE ===============
 const getDateToday = () => {
@@ -17,12 +18,35 @@ const getDateToday = () => {
   return date;
 };
 
-// ============ GET TIME FROM DATE OBJECT ===============
-const getTime = (date) => {
-  return date.split(".")[0];
-};
+const getHoursandMin = (timeStr) => {
+  // const newTime = time.split(".")[0];
+  const [hours, minutes, seconds] = timeStr.split(":");
+  return `${hours}:${minutes}`;
+}
 
-// =========== FETCH AIRPORT DETAILS BY IATA ============
+
+// ========== COMPARE TIME ==================
+const compareTime = (timeStr) => {
+  const now = new Date();
+
+  const flightTime = new Date();
+  const [hours, minutes] = timeStr.split(":");
+  flightTime.setHours(hours, minutes, 0, 0);
+
+
+  if (flightTime > now) {
+    return timeStr;
+  }
+
+  return null;
+
+}
+
+
+
+// ==========================================
+// FETCH AIRPORT DETAILS BY IATA
+//==========================================
 const getAirportsbyIata = async (iata_code) => {
   try {
     const key = `airport_details_for_${iata_code}`;
@@ -47,6 +71,9 @@ const getAirportsbyIata = async (iata_code) => {
     console.error(`An error occured: ${error}`);
   }
 };
+
+
+
 
 // ======================================
 // FETCH ALL CITIES IN AIRPORTS DB
@@ -79,6 +106,7 @@ const getNigerianAirportsInDB = async () => {
   }
 };
 
+
 // ========== EXTRACT CITIES FROM FETCHED NIGERIAN AIRPORTS ============
 const citiesToArr = async () => {
   try {
@@ -91,17 +119,50 @@ const citiesToArr = async () => {
 
     const airports = await getNigerianAirportsInDB();
 
-    const results = [...new Set(airports.map((a) => a.city))];
+    const cities = [...new Set(airports.map((a) => a.city))];
 
-    const valueInString = JSON.stringify(results);
+
+    const POPULARITY_RANK = {
+      "Lagos": 1,
+      "Abuja": 2,
+      "Port Harcourt": 3,
+      "Kano": 4,
+      "Enugu": 5,
+      "Owerri": 6,
+      "Benin": 7,
+      "Uyo": 8,
+      "Asaba": 9,
+      "Ibadan": 10,
+      "Yola": 11,
+      "Calabar": 12,
+      "Kaduna": 13,
+    };
+
+    cities.sort((a, b) => {
+      // Get rank or default to 100 if not in list
+      const rankA = POPULARITY_RANK[a] || 100;
+      const rankB = POPULARITY_RANK[b] || 100;
+
+      // If ranks are different, sort by rank (Ascending)
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+
+      // If ranks are the same, sort Alphabetically
+      return a.localeCompare(b);
+    });
+
+    const valueInString = JSON.stringify(cities);
     await redisClient.set(key, valueInString, "EX", LONG_TERM_IN_SECONDS_REDIS);
 
-    return results;
+    return cities;
   } catch (error) {
     console.error(`An error occured: ${error}`);
     throw error;
   }
 };
+
+
 
 // ==================================
 // FETCH ALL AIRPORTS IN A CITY
@@ -135,6 +196,8 @@ const getAirportsbyCity = async (city) => {
   }
 };
 
+
+
 // ======== EXTRACT THE IATA CODES OF THE FETCHED AIRPORTS TO AN ARRAY ==============
 const airportsIataArray = async (city) => {
   try {
@@ -158,8 +221,11 @@ const airportsIataArray = async (city) => {
   }
 };
 
+
+
+
 // =============================================================
-// FETCH ALL FLIGHT SCHEDULES BETWEEN AN ORIGIN AND DESTINATION
+// FETCH ALL FLIGHT SCHEDULES BETWEEN AN ORIGIN AND A DESTINATION
 // =============================================================
 const getFlightSchedulesbyIATA = async (origin, dest, date) => {
   // Pass in origin and dest as arrays
@@ -182,8 +248,7 @@ const getFlightSchedulesbyIATA = async (origin, dest, date) => {
           [Op.between]: [startOfDay, endOfDay],
         },
       },
-      distinct: true,
-      order: [["scheduledDepartureTime", "ASC"]],
+      order: [["scheduledDepartureTime", "ASC"], ["airlineName", "ASC"]],
       raw: true,
     });
 
@@ -210,7 +275,7 @@ const allFlightSchedules = async (originCity, destCity) => {
     const originIataArr = await airportsIataArray(originCity);
     const destIataArr = await airportsIataArray(destCity);
 
-    // console.log(`Origin IATA: ${originIataArr} \nDest IATA: ${destIataArr}\mDeparture Date: ${departure_date}`);
+    console.log(`Origin IATA: ${originIataArr} \nDestination IATA: ${destIataArr}\nDeparture Date: ${departure_date}`);
 
     const results = await getFlightSchedulesbyIATA(
       originIataArr,
@@ -221,8 +286,6 @@ const allFlightSchedules = async (originCity, destCity) => {
     // console.log(`\n\nFlight Results: ${results}`)
 
     for (data of results) {
-      // const originAirport = (await getAirportsbyIata(data.originAirportIata)).iata_code
-
       const flightData = {
         flightID: data.flightID,
         airlineName: data.airlineName,
@@ -241,8 +304,11 @@ const allFlightSchedules = async (originCity, destCity) => {
       flightSchedules.push(flightData);
     }
 
+    const filterdFlightSchedules = flightSchedules.filter((a) => {
+      compareTime(a.scheduledDepartureTime) != null;
+    })
 
-    const valueInString = JSON.stringify(flightSchedules);
+    const valueInString = JSON.stringify(filterdFlightSchedules);
     await redisClient.set(
       key,
       valueInString,
@@ -250,9 +316,10 @@ const allFlightSchedules = async (originCity, destCity) => {
       SHORT_TERM_IN_SECONDS_REDIS
     );
 
-    return flightSchedules;
+    return filterdFlightSchedules;
+
   } catch (error) {
-    console.error(`An error occured: ${error}`);
+    console.error(`An error occured while retrieving flight schedules: ${error}`);
     throw error;
   }
 };
@@ -269,8 +336,9 @@ const getAirlines = async (originCity, destCity) => {
 
     const flightSchedules = await allFlightSchedules(originCity, destCity);
 
+    // console.log(flightSchedules);
+
     const airlines = [...new Set(flightSchedules.map((a) => a.airlineName))];
-    airlines.sort();
 
     const valueInString = JSON.stringify(airlines);
     await redisClient.set(key, valueInString, "EX", LONG_TERM_IN_SECONDS_REDIS);
@@ -287,10 +355,12 @@ const fetchDatewithAirline = async (originCity, destCity, airline) => {
 
     const times = [
       ...new Set(
-          flightSchedules
-          .filter((a) => a.airlineName === airline) // ✅ Step 1: Filter
-          .map((a) => getTime(a.scheduledDepartureTime)) // ✅ Step 2: Map
-        )
+        flightSchedules
+          .filter((a) => a.airlineName === airline)
+          .map((a) => {
+            return getHoursandMin(a.scheduledDepartureTime);
+          })
+      )
       ];
 
     return times;
@@ -300,18 +370,21 @@ const fetchDatewithAirline = async (originCity, destCity, airline) => {
   }
 };
 
+
+
+
+// ======================================
+// FETCH USER QUERY
+// ======================================
 const fetchUserQuery = async (originCity, destCity, airline, time) => {
   try {
     const today = getDateToday();
-    const dateTime = `${today}T${time}.000`;
-    const timeStr = `${time}.000`
+    const dateTime = `${today}T${time}:00Z`;
+    const timeStr = `${time}:00.000`;
     let userQuery;
 
     const flightSchedules = await allFlightSchedules(originCity, destCity);
 
-    // console.log(flightSchedules);
-    console.log(timeStr)
-    console.log(airline);
     for (flight of flightSchedules) {
       if (
         flight.airlineName === airline &&
@@ -321,19 +394,17 @@ const fetchUserQuery = async (originCity, destCity, airline, time) => {
         break;
       }
     }
-    // console.log(userQuery);
-
-    const unique_key = `${userQuery.airlineIataCode}_${dateTime}_${userQuery.originAirportIata}_${userQuery.destAirportIata}`;
-
-    // console.log(unique_key);
+    const uniqueKey = `${userQuery.airlineIataCode}_${dateTime}_${userQuery.originAirportIata}_${userQuery.destAirportIata}`;
+    console.log(uniqueKey);
 
     const prediction = await Prediction.findOne({
       where: {
-        unique_key: { [Op.iLike]: unique_key },
+        unique_key: { [Op.iLike]: uniqueKey },
       },
       raw: true,
-      // order: [["updatedAt", DESC]]
     });
+
+    // console.log(userQuery);
 
     return [userQuery, prediction];
   } catch (error) {
@@ -342,9 +413,24 @@ const fetchUserQuery = async (originCity, destCity, airline, time) => {
   }
 };
 
+const getFinalMessage = (prediction) => {
+  let message = `Expect the flight to depart ON TIME!`;
+
+  if (prediction.stage === 2) {
+    if (prediction.prediction === 0) {
+      message = `Flight departure will be *DELAYED* by less than 30 minutes`;
+    }
+    message = `Expect atleast 30 minutes *DELAY* in flight departure`;
+  }
+  return message;
+}
+
+
 module.exports = {
   citiesToArr,
   getAirlines,
   fetchDatewithAirline,
   fetchUserQuery,
+  getHoursandMin,
+  getFinalMessage,
 };

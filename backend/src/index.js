@@ -33,9 +33,6 @@ app.listen(PORT, async () => {
 
     (async () => {
 
-      // const batchTimeStart = Date.now();
-      // console.log(`Batch process started at ${new Date(batchTimeStart).toISOString()}`);
-
       //Start counting time for the completion of this process
       console.log("Initializing Kafka setup");
 
@@ -54,24 +51,7 @@ app.listen(PORT, async () => {
       console.log("Connecting Kafka Producer");
       await connectProducer();
 
-      // Data fetching
-
-      // console.log("Performing data fetch");
-      // console.time("Combined data fetch duration");
-      // await fetchAllData({years: 1});
-      // console.log("✅ Both data fetches completed.");
-      // console.timeEnd("Combined data fetch duration");
-
-      // createDoneFlag(batchTimeStart);
-
-      // (async () => {
-      //   await runPeriodicJob({ years: 1 });
-      // })();
-
-      // (async () => {
-      //   await fetchAllHistoricalFlightsData({ days: 360 });
-      // })();
-
+      // Run Periodic Job
       await runPeriodicJob();
 
     })();

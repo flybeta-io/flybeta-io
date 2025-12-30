@@ -45,9 +45,13 @@ exports.saveMissingIcaoCodes = async () => {
  * Fetch and save departure flights for all airports.
  */
 exports.fetchAllHistoricalFlightsData = async ({ days = null, years = null }) => {
-  console.log(`                      Fetching Airports Data for Historical Flights Operation`);
+  console.log(
+    `                    Fetching Airports Data for Historical Flights Operation`
+  );
   const airports = await fetchAirportsDatafromDB();
-  console.log(`                    ✅Loaded ${airports.length} airports for historical flight operation`);
+  console.log(
+    `                    ✅Loaded ${airports.length} airports for historical flight operation`
+  );
 
   if (!airports.length) {
     console.warn("                    No IATA codes found in database.");
@@ -57,23 +61,27 @@ exports.fetchAllHistoricalFlightsData = async ({ days = null, years = null }) =>
   let chunks = [];
   if (days) {
     chunks = generateDailyChunk(days);
-    console.log(`               → Mode: Past ${days} days`);
+    console.log(`                    → Mode: Past ${days} days`);
   } else if (years) {
     chunks = generateDynamicYearChunks(years);
-    console.log(`               → Mode: Past ${years} year(s) (chunked by month)`);
+    console.log(
+      `                    → Mode: Past ${years} year(s) (chunked by month)`
+    );
   } else {
     throw new Error("                    Specify either { days } or { years }");
   }
 
 
   const iataCodesInDB = new Set(airports.map((a) => a.iata_code));
-  console.log(`                  Loaded ${iataCodesInDB.size} IATA codes into memory.`);
+  console.log(
+    `                    Loaded ${iataCodesInDB.size} IATA codes into memory.`
+  );
 
   // Sequentially process each airport code
   for (const { icao_code, iata_code } of airports) {
     try {
       console.log(
-        `                        Fetching historical flight data for IATA Code: ${iata_code}`
+        `                    Fetching historical flight data for IATA Code: ${iata_code}`
       );
       await fetchHistoricalFlightDataforSingleAirport(
         icao_code,
@@ -83,14 +91,14 @@ exports.fetchAllHistoricalFlightsData = async ({ days = null, years = null }) =>
       );
     } catch (err) {
       console.error(
-        `                        ❌ Failed fetching historical flights for ${iata_code}: ${err.message}`
+        `                    ❌ Failed fetching historical flights for ${iata_code}: ${err.message}`
       );
       continue;
     }
   }
 
   console.log(
-    "                  ✅ All historical flight data fetched and saved successfully."
+    "                    ✅ All historical flight data fetched and saved successfully."
   );
 };
 
@@ -101,10 +109,12 @@ exports.fetchAllHistoricalFlightsData = async ({ days = null, years = null }) =>
 
 exports.fetchAllDailyFlights = async () => {
   console.log(
-    `                      ✅Fetching Airports Data for Daily Flights Operation`
+    `                    ✅Fetching Airports Data for Daily Flights Operation`
   );
   const airports = await fetchAirportsDatafromDB();
-  console.log(`                      ✅Loaded ${airports.length} airports for flights operation`);
+  console.log(
+    `                    ✅Loaded ${airports.length} airports for flights operation`
+  );
 
   if (!airports.length) {
     console.warn("                    No IATA codes found in database.");
@@ -113,14 +123,14 @@ exports.fetchAllDailyFlights = async () => {
 
   const iataCodesInDB = new Set(airports.map((a) => a.iata_code));
   console.log(
-    `                  Loaded ${iataCodesInDB.size} IATA codes into memory.`
+    `                    Loaded ${iataCodesInDB.size} IATA codes into memory.`
   );
 
   // Sequentially process each airport code
   for (const { icao_code, iata_code } of airports) {
     try {
       console.log(
-        `                        Fetching daily flight data for IATA Code: ${iata_code}`
+        `                    Fetching daily flight data for IATA Code: ${iata_code}`
       );
       await fetchDailyFlightSchedule(
         icao_code,
@@ -129,14 +139,14 @@ exports.fetchAllDailyFlights = async () => {
       );
     } catch (err) {
       console.error(
-        `                        ❌ Failed fetching flights for ${iata_code}: ${err.message}`
+        `                    ❌ Failed fetching flights for ${iata_code}: ${err.message}`
       );
       continue;
     }
   }
 
   console.log(
-    "                  ✅ All daily flight data fetched and saved successfully."
+    "                    ✅ All daily flight data fetched and saved successfully."
   );
 
 }

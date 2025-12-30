@@ -76,7 +76,8 @@ const fetchAllData = async ({days = null, years = null }) => {
 
         // Stop if we ran out of airports
         if (batch.length === 0) {
-            console.log("✅ All airports processed. Exiting.");
+          console.log("✅ All airports processed. Exiting.");
+          j = 0;
             break;
         }
         console.log(`🚀 Processing batch ${j} to ${j + batch.length}...`);
@@ -116,7 +117,7 @@ const fetchAllData = async ({days = null, years = null }) => {
 // ==========================================
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
-let cycle = 0;
+let cycle = 1;
 
 exports.runPeriodicJob = async () => {
   console.log("🚀 Starting Periodic Job Service...");
@@ -128,7 +129,7 @@ exports.runPeriodicJob = async () => {
 
       await fetchAllData({ years: 1 });
 
-      console.log(`✅ Cycle completed ${cycle} successfully.`);
+      console.log(`✅ Cycle ${cycle} completed successfully.`);
       console.timeEnd("Combined data fetch duration");
     } catch (err) {
 
@@ -138,9 +139,9 @@ exports.runPeriodicJob = async () => {
     console.log("\n\n💤 Sleeping for 2 hours...");
     cycle += 1;
     (async () => {
-      console.time("Historical Fight Data Fetch")
+      console.time("                    Historical Fight Data Fetch");
       await fetchAllHistoricalFlightsData({ days: 360 });
-      console.timeEnd("Historical Fight Data Fetch");
+      console.timeEnd("                    Historical Fight Data Fetch");
     })();
     await delay(TWO_HOURS_MS);
   }

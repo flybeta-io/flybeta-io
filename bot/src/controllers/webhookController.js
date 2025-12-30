@@ -9,6 +9,8 @@ const {
   getAirlines,
   fetchDatewithAirline,
   fetchUserQuery,
+  getHoursandMin,
+  getFinalMessage,
 } = require("../utils/database");
 const { USER_STATE_MANAGEMENT_IN_SECONDS } = require("../../config/env");
 
@@ -16,13 +18,7 @@ const { USER_STATE_MANAGEMENT_IN_SECONDS } = require("../../config/env");
 // CONFIGURATION & DATA
 // ==========================================
 
-// const CITIES = ["Lagos", "Abuja", "Kano", "Port Harcourt", "Enugu", "Owerri", "Ibadan", "Benin"];
-// const AIRLINES = ["Air Peace", "Ibom Air", "Arik Air", "Dana Air", "Green Africa", "Overland"];
-// const TIMES = [
-//   "Morning (6am-11am)",
-//   "Afternoon (12pm-4pm)",
-//   "Evening (5pm-9pm)",
-// ];
+
 let CITIES;
 let AIRLINES;
 let TIMES;
@@ -155,7 +151,7 @@ exports.handleIncomingMessages = async (req, res) => {
                 userData.airline
               );
               list = TIMES;
-              prompt = "Select Time:";
+              prompt = "Select Time (GMT):";
             }
 
             await sendPaginatedOptions(from, prompt, list, page, type);
@@ -175,7 +171,7 @@ exports.handleIncomingMessages = async (req, res) => {
                 origin: value,
               });
               await sendWhatsAppMessage(from, `✅ Origin set to ${value}`);
-              await sendWhatsAppMessage(from, `Where are you flying to`);
+              await sendWhatsAppMessage(from, `Where are you flying to?`);
               // Trigger Next Step: Destination
               await sendPaginatedOptions(
                 from,
@@ -219,7 +215,7 @@ exports.handleIncomingMessages = async (req, res) => {
               console.log(TIMES);
               await sendPaginatedOptions(
                 from,
-                "Select Departure Time:",
+                "Select Departure Time (GMT):",
                 TIMES,
                 0,
                 "time"
@@ -233,7 +229,7 @@ exports.handleIncomingMessages = async (req, res) => {
 
               await sendWhatsAppMessage(
                 from,
-                `📝 Summary:\nFrom: ${finalData.origin}\nTo: ${finalData.destination}\nAirline: ${finalData.airline}\nTime: ${value}\n\nFetching predictions... ⏳`
+                `📝 Summary:\nFrom: ${finalData.origin}\nTo: ${finalData.destination}\nAirline: ${finalData.airline}\nTime: ${value} (GMT)\n\nFetching predictions... ⏳`
               );
 
               // ===========================
@@ -246,11 +242,18 @@ exports.handleIncomingMessages = async (req, res) => {
                 userData.airline,
                 value
               );
-              // console.log(results)
 
               await sendWhatsAppMessage(
                 from,
-                `Flight ID: ${userQuery.flightID} \nAirline Name: ${userQuery.airlineName} \nOrigin Airport: ${userQuery.originAirport} (${userQuery.originAirportIata}) \nDestination Airport: ${userQuery.destAirport} (${userQuery.destAirportIata}) \nDeparture Time: ${userQuery.scheduledDepartureTime}`
+                `*Flight Details*\n\n*Flight ID*\n${userQuery.flightID}\n\n*Airline Name*\n${
+                  userQuery.airlineName
+                } \n\n*Origin Airport*\n${userQuery.originAirport} (${
+                  userQuery.originAirportIata
+                }) \n\n*Destination Airport*\n${userQuery.destAirport} (${
+                  userQuery.destAirportIata
+                }) \n\n*Departure Time*\n${getHoursandMin(
+                  userQuery.scheduledDepartureTime
+                )} (GMT)`
               );
 
               if (prediction === null) {
@@ -261,11 +264,9 @@ exports.handleIncomingMessages = async (req, res) => {
                 return;
               }
 
-              // await sendWhatsAppMessage(from, results);
+              let message = getFinalMessage(prediction);
 
-              // Example:
-              // const schedules = await mergeSchedules(finalData.origin, finalData.destination, ...);
-              // ... rest of your logic
+              await sendWhatsAppMessage(from, message);
 
               await setUserState(from, "IDLE", { time: value }); // Reset state
             }
