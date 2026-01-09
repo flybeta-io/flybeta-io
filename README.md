@@ -12,7 +12,8 @@ By strictly decoupling data ingestion, intelligence (ML), and user interaction, 
 The system follows a linear pipeline: **Ingest → Process → Intelligence → Serve**.
 
 1. **Ingestion:** Independent fetcher scripts pull live data from external APIs and produce events into **Kafka** hot storage topics.
-2. **Stream Processing:** **Apache Flink** consumes concurrent streams (flight + weather), managing time-windows and orchestrating decision logic.
+2. **Stream Processing:** Scripts consumes from the Kafka topics and saves to PostgreSQL
+**Apache Flink** consumes concurrent streams (flight + weather), managing time-windows and orchestrating decision logic.
 3. **Intelligence:** The ML service consumes processed streams to detect anomalies and predict potential disruptions.
 4. **Delivery:** The WhatsApp Bot acts as a final consumer, serving alerts to users via **Redis** for high-speed session management.
 
@@ -23,18 +24,18 @@ graph TD
     end
 
     subgraph Intelligence
-    B -->|Consume Streams| C{Apache Flink}
-    C -- 1. Detect Delay --> D[ML Stage 1]
-    D -- If Delay Detected --> E[ML Stage 2]
-    E -->|Duration Prediction| C
-    C -->|Final Result| F(Kafka: Predictions)
+    B -->|Consume Streams| C{Apache Flink} H[(PostgreSQL)]
+    C -- 1. Detect Delay --> E[ML Stage 1]
+    E -- If Delay Detected --> F[ML Stage 2]
+    F -->|Duration Prediction| C
+    C -->|Final Result| G(Kafka: Predictions)
     end
 
     subgraph Serving
-    F -->|Persist| G[(PostgreSQL)]
-    H[WhatsApp Bot] <-->|Session State| I[(Redis)]
-    H -->|Query Results| G
-    H <-->|Alerts| J((End User))
+    G -->|Persist| H[(PostgreSQL)]
+    I[WhatsApp Bot] <-->|Session State & Query Results| J[(Redis)]
+    I <--|Make a Query| H
+    I <-->|Alerts| K((End User))
     end
 
 ```
@@ -59,7 +60,7 @@ graph TD
 
 ## 2. Model Development
 
-**Lead Data Scientist:** [Name]
+**Lead Data Scientist:** Kofoworola Egbinola
 
 The core intelligence of FlyBeta relies on a **Two-Stage Classification Pipeline** powered by **XGBoost**, designed to predict flight disruptions in the noisy Nigerian aviation market. The model prioritizes **Recall (76.4%)** to minimize the risk of missing actual delays.
 
