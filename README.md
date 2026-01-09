@@ -23,19 +23,26 @@ graph TD
     A[External APIs] -->|Fetcher Scripts| B(Kafka: Hot Storage)
     end
 
+    subgraph Storage_Sync
+    %% The specific correction: Scripts fetch from Hot Storage and save to DB
+    B -->|Sync Scripts| H[(PostgreSQL)]
+    end
+
     subgraph Intelligence
-    B -->|Consume Streams| C{Apache Flink} H[(PostgreSQL)]
+    B -->|Consume Streams| C{Apache Flink}
     C -- 1. Detect Delay --> E[ML Stage 1]
     E -- If Delay Detected --> F[ML Stage 2]
     F -->|Duration Prediction| C
     C -->|Final Result| G(Kafka: Predictions)
+    %% Assuming predictions are also persisted to DB for the bot to read
+    G -->|Persist Predictions| H
     end
 
     subgraph Serving
-    G -->|Persist| H[(PostgreSQL)]
-    I[WhatsApp Bot] <-->|Session State & Query Results| J[(Redis)]
-    I <--|Make a Query| H
-    I <-->|Alerts| K((End User))
+    I[WhatsApp Bot] <-->|Session State & Query Cache| J[(Redis)]
+    I -->|1. Check Cache| J
+    I -->|2. Query Data if miss| H
+    I -->|Alerts| K((End User))
     end
 
 ```
@@ -44,7 +51,8 @@ graph TD
 
 | Service | Tech Stack | Role |
 | --- | --- | --- |
-| **Core Backend** | Node.js / Express | Central ingestion engine; manages cron jobs and Kafka production. |
+| **Core Backend** | Node.js / Express | Central ingestion engine; manages cron jobs, Kafka production and raw data consumption from Kafka to PostgreSQL DB
+. |
 | **Flink Service** | Apache Flink (PyFlink) | Real-time computation engine; handles windowing and ML orchestration. |
 | **Bot Service** | Node.js / Express | Manages WhatsApp webhooks and user sessions via Redis. |
 | **Data Storage** | PostgreSQL | The "Single Source of Truth" accessed via Cloud SQL Proxy. |
