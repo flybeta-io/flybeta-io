@@ -54,7 +54,7 @@ graph TD
 | **Core Backend** | Node.js / Express | Central ingestion engine; manages cron jobs, Kafka production and raw data consumption from Kafka to PostgreSQL DB. |
 | **ML API Service** | Python / FastAPI | Loads hosted transformation objects (scalers/encoders) to prepare data for the models to produe the results. |
 | **Flink Service** | Apache Flink (PyFlink) | Real-time computation engine; handles windowing and ML orchestration. |
-| **Bot Service** | Node.js / Express | Manages WhatsApp webhooks and user sessions via Redis. |
+| **Bot Service** | Node.js / Express | Manages WhatsApp webhooks, user sessions and cached data via Redis. |
 | **Data Storage** | PostgreSQL | The "Single Source of Truth" accessed via Cloud SQL Proxy. |
 
 **Key Infrastructure:**
