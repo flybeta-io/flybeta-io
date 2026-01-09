@@ -12,7 +12,7 @@ By strictly decoupling data ingestion, intelligence (ML), and user interaction, 
 The system follows a linear pipeline: **Ingest → Process → Intelligence → Serve**.
 
 1. **Ingestion:** Independent fetcher scripts pull live data from external APIs and produce events into **Kafka** hot storage topics.
-2. **Stream Processing:** Scripts consumes from the Kafka topics and saves to PostgreSQL
+2. **Stream Processing:** Dedicated scripts consumes from the Kafka topics and saves to directly to PostgreSQL DB.
 **Apache Flink** consumes concurrent streams (flight + weather), managing time-windows and orchestrating decision logic.
 3. **Intelligence:** The ML service consumes processed streams to detect anomalies and predict potential disruptions.
 4. **Delivery:** The WhatsApp Bot acts as a final consumer, serving alerts to users via **Redis** for high-speed session management.
