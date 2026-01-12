@@ -62,7 +62,7 @@ graph TD
 * **Kafka Strategy:** Utilizes distinct topics for "Hot" (Live Data) and "Cold" (Historical Training Data) storage.
 * **Networking:** All services communicate via a private Docker bridge (`flybeta-network`); only the Bot port is exposed publicly via Ngrok.
 
-📄 **[Read the Full System Architecture Documentation](https://docs.google.com/document/d/1SVVZyTbmWBaaYzIKT556GBqYDPqOM-0v0d-iAosl4D0/edit?usp=sharing)**
+📄 **[Read the Full System Architecture Documentation](https://docs.google.com/document/d/1V2_hH3CeiyWze7Az4IhsA4veVG46B4BW2Jf573_j_x8/edit?usp=sharing)**
 
 
 
